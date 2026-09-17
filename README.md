@@ -88,9 +88,10 @@ que puedan cambiarse sin tocar las cartas:
 - El partido empieza con el mazo combinado barajado y sin CC en mano; se roba
   hasta agotarlo. Las CC robadas entran en la mano y cada CF se resuelve en el
   momento en que aparece.
-- En las CC, un empate en una comparación la supera (`>=`) por defecto; se
-  puede cambiar con `MatchRules(ties_succeed=False)`. Las CF actualizadas usan
-  comparaciones estrictas (`>`), tal como indica su definición.
+- En las CC y las CF, un empate en una comparación **no** la supera: se exige
+  una comparación estricta (`>`) por defecto; se puede cambiar con
+  `MatchRules(ties_succeed=True)` para que el empate cuente como éxito (`>=`).
+  Las CF definen además sus propias comparaciones estrictas de forma explícita.
 - Un `+CC` se suma al atributo del jugador en la siguiente comparación de CC y
   se consume al jugar esa carta. Un `+CF` se acumula y se suma al atributo del
   jugador al resolver la siguiente CF; entonces se consume.

@@ -53,7 +53,10 @@ def _effect_text(effect: Effect) -> str:
 def _comparison_text(state: MatchState, comparison: Comparison, bonus: int) -> str:
     player = state.player.value(comparison.player_attribute) + bonus
     opponent = state.opponent.value(comparison.opponent_attribute) + comparison.opponent_modifier
-    operator = ">=" if (comparison.ties_succeed is not False) else ">"
+    ties_succeed = (
+        state.rules.ties_succeed if comparison.ties_succeed is None else comparison.ties_succeed
+    )
+    operator = ">=" if ties_succeed else ">"
     return (
         f"{comparison.player_attribute.value} jugador {player} {operator} "
         f"{comparison.opponent_attribute.value} rival {opponent}"
@@ -79,7 +82,10 @@ def _finalization_comparison_text(
         if comparison.opponent_modifier == 0
         else f"{opponent_base} {comparison.opponent_modifier:+d} = {opponent_value}"
     )
-    operator = ">=" if (comparison.ties_succeed is not False) else ">"
+    ties_succeed = (
+        state.rules.ties_succeed if comparison.ties_succeed is None else comparison.ties_succeed
+    )
+    operator = ">=" if ties_succeed else ">"
     return (
         f"{comparison.player_attribute.value} jugador {' '.join(pieces)} = {player_value} "
         f"{operator} {comparison.opponent_attribute.value} rival {opponent}"

@@ -408,7 +408,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
                 Effect(discard_top_cards=1, pressure_delta=-1),
-                strict_comparison(Attribute.AT, Attribute.DEF),
+                strict_comparison(Attribute.AT, Attribute.DEF, 1),
             ),
             FinalizationOutcome(
                 "Roba 1 CR y -1 Presión",
@@ -424,7 +424,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
                 Effect(pressure_delta=-2),
-                strict_comparison(Attribute.AT, Attribute.DEF),
+                strict_comparison(Attribute.AT, Attribute.DEF, 1),
             ),
             FinalizationOutcome(
                 "Descarta una CC de la mano y roba 1 CR",
@@ -459,10 +459,10 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "draw_foul", "Provocar la falta",
             FinalizationOutcome(
-                "Tarjeta roja",
+                "Tarjeta roja y descarta una carta del mazo",
                 OutcomeKind.RED_CARD,
                 2,
-                Effect(red_cards=1),
+                Effect(red_cards=1, discard_top_cards=1),
                 strict_comparison(Attribute.AT, Attribute.DEF, 5),
             ),
             FinalizationOutcome(
@@ -673,10 +673,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "robo_mediocampo",
             "Robo en medio campo",
             _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4)),
-            _red_action(
-                Attribute.MED, Attribute.MED, 3, Effect(pressure_delta=4),
-                rival_must_be_lower=True,
-            ),
+            _red_action(Attribute.MED, Attribute.MED, 3, Effect(pressure_delta=4)),
             Effect(pressure_delta=2),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,

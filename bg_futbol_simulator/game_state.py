@@ -32,7 +32,7 @@ class Team:
 class MatchRules:
     """Reglas de flujo configurables que no forman parte de una carta."""
 
-    ties_succeed: bool = True
+    ties_succeed: bool = False
     pressure_floor: int = 0
     pressure_goal_threshold: int = 9
     initial_pressure: int = 0
