@@ -117,7 +117,11 @@ class AutomaticPlayerAI:
             potential = 0
             effect_values = [self._effect_value(state, card.options[0].effect)]
             for option in card.options[1:]:
-                assert option.comparison is not None
+                if option.comparison is None:
+                    usable += 1
+                    potential += 1
+                    effect_values.append(self._effect_value(state, option.effect))
+                    continue
                 if self.engine.comparison_succeeds(
                     state, option.comparison, state.pending_cc_bonus
                 ):

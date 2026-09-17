@@ -332,7 +332,7 @@ def write_match_trace(
         f"· AT {opponent_team.attack}"
     )
     line("- Mazo: 28 CC, 12 CF y 10 CE; mazo de CR aparte: 16 (8 tipos × 2)")
-    line("- Mano inicial: 0 CC; límite: 5 CC")
+    line(f"- Mano inicial: 0 CC; límite: {state.rules.max_control_hand_size} CC")
     line("- Gol del bot: al superar presión 9, la presión vuelve a 0")
     line(
         "- Estrategia: "

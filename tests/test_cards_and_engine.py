@@ -43,11 +43,17 @@ class CardCatalogueTests(unittest.TestCase):
 
     def test_every_control_card_has_exactly_three_exclusive_options(self) -> None:
         for card in card_catalogue().values():
-            if isinstance(card, ControlCard):
+            if isinstance(card, ControlCard) and card.definition_id != "fuerza_del_debil":
                 self.assertEqual(
                     ("base", "comparison_1", "comparison_2"),
                     tuple(option.key for option in card.options),
                 )
+
+    def test_weak_team_support_card_has_two_unconditional_options(self) -> None:
+        card = card_catalogue()["fuerza_del_debil"]
+        self.assertIsInstance(card, ControlCard)
+        self.assertEqual(("option_1", "option_2"), tuple(option.key for option in card.options))
+        self.assertTrue(all(option.comparison is None for option in card.options))
 
 
 class EngineTests(unittest.TestCase):

@@ -19,6 +19,8 @@ from .cards import (
     RivalCondition,
     build_match_deck,
     build_red_card_deck,
+    strong_team_handicap_card,
+    weak_team_support_card,
 )
 from .game_state import (
     ControlPlan,
@@ -71,6 +73,7 @@ class RulesEngine:
 
         active_rules = rules or MatchRules()
         deck = build_match_deck()
+        deck.extend(self._balance_cards(player, opponent))
         rng.shuffle(deck)
         red_deck = build_red_card_deck()
         rng.shuffle(red_deck)
@@ -83,6 +86,29 @@ class RulesEngine:
             pressure=active_rules.initial_pressure,
             randomizer=rng,
         )
+
+    @staticmethod
+    def _balance_cards(player: Team, opponent: Team) -> list[CardInstance]:
+        """Añade cartas de equilibrio según la diferencia total de atributos.
+
+        Por cada 10 puntos que el jugador quede por debajo del rival (suma de
+        DEF+MED+AT) se añade una copia de "La fuerza del débil"; por cada 10
+        puntos que quede por encima, una copia de "La fuerza del rival Débil".
+        """
+
+        player_total = player.defense + player.midfield + player.attack
+        opponent_total = opponent.defense + opponent.midfield + opponent.attack
+        gap = opponent_total - player_total
+        instances: list[CardInstance] = []
+        if gap >= 10:
+            card = weak_team_support_card()
+            for copy_number in range(1, gap // 10 + 1):
+                instances.append(CardInstance(f"{card.definition_id}-{copy_number}", card))
+        elif gap <= -10:
+            card = strong_team_handicap_card()
+            for copy_number in range(1, (-gap) // 10 + 1):
+                instances.append(CardInstance(f"{card.definition_id}-{copy_number}", card))
+        return instances
 
     def comparison_succeeds(
         self,

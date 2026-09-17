@@ -91,7 +91,7 @@ class ControlCard:
     definition_id: str
     name: str
     copies: int
-    options: tuple[ControlOption, ControlOption, ControlOption]
+    options: tuple[ControlOption, ...]
 
     def option(self, key: str) -> ControlOption:
         for option in self.options:
@@ -549,6 +549,38 @@ def event_card_definitions() -> tuple[EventCard, ...]:
     )
 
 
+def weak_team_support_card() -> ControlCard:
+    """CC de equilibrio: se añade una copia por cada 10 puntos que el equipo
+    del jugador quede por debajo del rival (suma de DEF+MED+AT). Solo tiene
+    dos opciones, ambas sin comparación, siempre jugables.
+    """
+
+    return ControlCard(
+        definition_id="fuerza_del_debil",
+        name="La fuerza del débil",
+        copies=0,
+        options=(
+            ControlOption("option_1", "Opción 1", Effect(pressure_delta=-2, cc_bonus=4)),
+            ControlOption("option_2", "Opción 2", Effect(cf_bonus=4)),
+        ),
+    )
+
+
+def strong_team_handicap_card() -> EventCard:
+    """CE de equilibrio: se añade una copia por cada 10 puntos que el equipo
+    del jugador supere al rival (suma de DEF+MED+AT).
+    """
+
+    return _event(
+        "fuerza_rival_debil",
+        "La fuerza del rival Débil",
+        0,
+        Effect(discard_top_cards=2, pressure_delta=6),
+        Effect(discard_top_cards=1, pressure_delta=2, cr_draws=1),
+        Effect(discard_top_cards=1, red_injury_rolls=1, pressure_delta=5),
+    )
+
+
 def _red_action(
     rival_attribute: Attribute,
     player_attribute: Attribute,
@@ -610,7 +642,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Ataque por banda",
             _red_action(Attribute.MED, Attribute.DEF, 2, Effect(pressure_delta=5)),
             _red_action(Attribute.MED, Attribute.MED, 1, Effect(pressure_delta=4)),
-            Effect(pressure_delta=2),
+            Effect(pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
                 Effect(discard_top_cards=1),
@@ -627,7 +659,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Attribute.MED, Attribute.MED, 2,
                 Effect(discard_control_cards=1, pressure_delta=4),
             ),
-            Effect(discard_control_cards=1, pressure_delta=1),
+            Effect(discard_control_cards=1, pressure_delta=2),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
                 Effect(discard_top_cards=1),
@@ -641,7 +673,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Attribute.AT, Attribute.DEF, 1,
                 Effect(player_yellow_cards=1, pressure_delta=3),
             ),
-            Effect(discard_top_cards=1, player_yellow_cards=1),
+            Effect(discard_top_cards=1, player_yellow_cards=1, pressure_delta=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(pressure_delta=1),
@@ -652,7 +684,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Balón parado",
             _red_action(Attribute.AT, Attribute.DEF, 4, Effect(bot_goals=1)),
             _red_action(Attribute.AT, Attribute.DEF, 2, Effect(pressure_delta=3)),
-            Effect(pressure_delta=2),
+            Effect(pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
                 Effect(discard_top_cards=1),
@@ -663,7 +695,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Centro al área",
             _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=5)),
             _red_action(Attribute.AT, Attribute.DEF, 2, Effect(pressure_delta=4)),
-            Effect(pressure_delta=2),
+            Effect(pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(pressure_delta=1),
@@ -674,7 +706,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Robo en medio campo",
             _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4)),
             _red_action(Attribute.MED, Attribute.MED, 3, Effect(pressure_delta=4)),
-            Effect(pressure_delta=2),
+            Effect(pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(player_yellow_cards=1),
@@ -691,7 +723,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Attribute.AT, Attribute.MED, 0,
                 Effect(recover_control_cards=1, draw_red_cards=1),
             ),
-            Effect(pressure_delta=3),
+            Effect(pressure_delta=4),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
                 Effect(player_yellow_cards=1, recover_control_cards=1),
@@ -705,7 +737,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Effect(recover_control_cards=1, pressure_delta=4),
             ),
             _red_action(Attribute.MED, Attribute.MED, 2, Effect(pressure_delta=5)),
-            Effect(pressure_delta=2),
+            Effect(pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(discard_control_cards=1),
@@ -735,6 +767,8 @@ def all_card_definitions() -> tuple[CardDefinition, ...]:
         *control_card_definitions(),
         *finalization_card_definitions(),
         *event_card_definitions(),
+        weak_team_support_card(),
+        strong_team_handicap_card(),
     )
 
 

@@ -11,6 +11,7 @@ license = { text = "Proprietary" }
 
 [project.scripts]
 bg-futbol-sim = "bg_futbol_simulator.main:main"
+bg-futbol-balance = "bg_futbol_simulator.balance_report:main"
 
 [tool.setuptools]
 packages = ["bg_futbol_simulator"]
