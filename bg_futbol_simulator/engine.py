@@ -297,6 +297,15 @@ class RulesEngine:
         preview = self.evaluate_finalization(state, instance.card)
         state.pending_cf_bonus = 0
         self._apply_full_effect(state, preview.outcome.effect, ai, log=log)
+
+        conditional = instance.card.conditional
+        if conditional is not None:
+            conditional_met = self._rival_condition_met(state, conditional.condition)
+            if conditional_met:
+                self._apply_full_effect(state, conditional.effect, ai, log=log)
+                if log:
+                    self._log(state, "cf_condicional", conditional.label)
+
         if return_to_discard:
             state.discard_pile.append(instance)
         state.finalizations.append(preview.resolution)
