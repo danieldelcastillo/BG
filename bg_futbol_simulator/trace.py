@@ -42,7 +42,7 @@ def _effect_text(effect: Effect) -> str:
     if effect.discard_control_cards:
         parts.append(f"descarta {effect.discard_control_cards} CC de la mano")
     if effect.recover_control_cards:
-        parts.append("recupera 1 CC del descarte")
+        parts.append(f"recupera {effect.recover_control_cards} CC del descarte")
     if effect.play_random_discard_finalizations:
         parts.append("juega una CF aleatoria del descarte")
     if effect.draw_red_cards:
