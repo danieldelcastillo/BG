@@ -81,7 +81,7 @@ class EngineTests(unittest.TestCase):
 
     def test_cf_bonus_accumulates_and_is_consumed_on_resolution(self) -> None:
         state = _state()
-        state.pending_cf_bonus = 5
+        state.pending_cf_bonus = 9
         finalization = _instance("one_on_one")
         resolution = self.engine.resolve_finalization(state, finalization)
 
@@ -106,7 +106,7 @@ class EngineTests(unittest.TestCase):
         )
 
     def test_updated_cutback_uses_midfield(self) -> None:
-        state = _state(player=Team(15, 20, 99))
+        state = _state(player=Team(15, 21, 99))
         cutback = _instance("cutback")
 
         self.assertEqual(
