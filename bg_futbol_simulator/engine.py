@@ -58,10 +58,44 @@ _GOAL_AGAINST_JOKES: tuple[str, ...] = (
     "La defensa se quedó posando para la foto del equipo.",
     "Ese gol tuvo más aplausos del banquillo rival que del tuyo.",
     "El portero pensó que era un tiro de esquina y no uno a puerta.",
+    "El portero se fue a comprar palomitas justo antes del gol.",
+    "La defensa hizo una guardia de honor al delantero rival.",
+    "Ese gol entró con más facilidad que en el modo fácil del videojuego.",
+    "El equipo entero se puso de acuerdo para no marcar al rival.",
+    "El portero le pidió perdón al palo por no llegar.",
+    "Esa jugada se ensayó mejor en el entrenamiento del rival que en el tuyo.",
+    "El portero se quedó plantado como una farola.",
+    "La defensa decidió tomarse un descanso justo en el peor momento.",
+    "Ese gol pasó más desapercibido para tu equipo que para el marcador.",
+    "El banquillo propio se tapó los ojos al verlo venir.",
+)
+
+# Frases al marcar tú un gol.
+_GOAL_FOR_JOKES: tuple[str, ...] = (
+    "Ese gol merece hasta un baile en el centro del campo.",
+    "El portero rival se quedó pidiendo la hora.",
+    "Ese remate tuvo más precisión que un GPS.",
+    "El larguero ni se enteró de que pasó el balón.",
+    "La afición ya está pidiendo la repetición en la pantalla gigante.",
+    "Ese gol se merece un anuncio por megafonía.",
+    "El delantero se cree crack por un rato, y con razón.",
+    "El portero rival sigue buscando el balón.",
+    "Ese gol entró más fino que un bisturí.",
+    "La grada se volvió loca, hasta el árbitro sonrió.",
+    "El VAR ni se molestó en revisarlo, fue un golazo limpio.",
+    "El banquillo rival ya está pidiendo un cambio de portero.",
+    "Ese gol quedará en la memoria... al menos hasta el próximo.",
+    "El defensor rival sigue corriendo detrás del balón fantasma.",
+    "Ese remate llevaba nombre y apellido.",
+    "El portero rival se lanzó al lado equivocado del planeta.",
+    "Ese gol se paga con entradas de cine para todo el equipo.",
+    "El delantero rival mira con envidia esa definición.",
+    "Ese balón entró como si tuviera GPS propio.",
+    "La grada rival se quedó en silencio sepulcral.",
 )
 
 # Frases al recibir una tarjeta roja propia (directa o por doble amarilla).
-_RED_CARD_JOKES: tuple[str, ...] = (
+_RED_CARD_OWN_JOKES: tuple[str, ...] = (
     "El árbitro sacó la roja más rápido que un mesero trayendo la cuenta.",
     "Directo a la ducha, sin pasar por el banquillo.",
     "Esa entrada se vio hasta en la repetición en cámara súper lenta... tres veces.",
@@ -76,7 +110,44 @@ _RED_CARD_JOKES: tuple[str, ...] = (
     "Esa entrada mereció hasta aplausos... del árbitro sacando la tarjeta.",
     "El jugador se fue camino al vestuario contando ovejas.",
     "Esa tarjeta roja se vio venir desde el calentamiento.",
+    "El técnico ya está buscando explicaciones para la rueda de prensa.",
+    "Esa expulsión dejó al equipo jugando con uno menos y con la moral por el suelo.",
+    "El jugador se fue del campo escuchando abucheos propios.",
+    "Esa tarjeta se vio venir desde la grada más lejana.",
+    "El árbitro guardó la tarjeta amarilla, ya no hacía falta.",
+    "Esa expulsión va directa al resumen de lo peor del partido.",
 )
+
+# Frases al ver al bot expulsado con tarjeta roja.
+_RED_CARD_RIVAL_JOKES: tuple[str, ...] = (
+    "El árbitro le mostró la roja al bot más rápido que un parpadeo.",
+    "El bot se va a la ducha sin decir ni pío.",
+    "Esa expulsión rival hay que celebrarla con confeti.",
+    "El bot se quedó sin argumentos para protestar.",
+    "El árbitro sacó la tarjeta con una sonrisa de oreja a oreja.",
+    "El bot se va del campo como quien pierde una apuesta.",
+    "Esa roja al rival cae más dulce que un helado en verano.",
+    "El banquillo rival se quedó sin palabras.",
+    "El bot recibió la tarjeta y hasta el público local aplaudió.",
+    "Esa expulsión rival vino con moño de regalo.",
+    "El árbitro no dudó ni un segundo en mandarlo a la caseta.",
+    "El bot se despide del partido sin derecho a réplica.",
+    "El técnico rival ya está pensando en un plan B, sin ese jugador.",
+    "Esa roja al bot se ve venir como Navidad en diciembre.",
+    "El bot se va pensando en qué le dirá a su entrenador virtual.",
+)
+
+
+def _pick_joke(state: MatchState, phrases: tuple[str, ...]) -> str:
+    """Elige una frase al azar sin repetirla hasta agotar la lista."""
+
+    available = [phrase for phrase in phrases if phrase not in state.used_jokes]
+    if not available:
+        state.used_jokes.difference_update(phrases)
+        available = list(phrases)
+    phrase = state.randomizer.choice(available)
+    state.used_jokes.add(phrase)
+    return phrase
 
 
 class IllegalPlay(ValueError):
@@ -554,14 +625,15 @@ class RulesEngine:
             state.bot_goals_from_pressure += 1
             if log:
                 self._log(state, "gol_bot_presion", "El bot marca por superar presión 9; presión a 0")
-                self._log(state, "broma", state.randomizer.choice(_GOAL_AGAINST_JOKES))
+                self._log(state, "broma", _pick_joke(state, _GOAL_AGAINST_JOKES))
         state.player_goals += effect.goals
         if effect.goals and log:
             self._log(state, "gol_jugador", "¡Gol del jugador!")
+            self._log(state, "broma", _pick_joke(state, _GOAL_FOR_JOKES))
         state.bot_goals_from_red_cards += effect.bot_goals
         if effect.bot_goals and log:
             self._log(state, "gol_en_contra", "Gol en contra por una CR")
-            self._log(state, "broma", state.randomizer.choice(_GOAL_AGAINST_JOKES))
+            self._log(state, "broma", _pick_joke(state, _GOAL_AGAINST_JOKES))
         for _ in range(effect.yellow_cards):
             self._bot_yellow_card(state, log=log)
         for _ in range(effect.red_cards):
@@ -610,6 +682,7 @@ class RulesEngine:
         )
         if log:
             self._log(state, "expulsion", "El bot recibe una roja: -2 MED y -4 AT")
+            self._log(state, "broma", _pick_joke(state, _RED_CARD_RIVAL_JOKES))
 
     def _send_off_random_player(
         self, state: MatchState, team: Team, label: str, *, log: bool
@@ -629,7 +702,7 @@ class RulesEngine:
                 f"({player.attribute.value} {player.value})",
             )
             if team is state.player:
-                self._log(state, "broma", state.randomizer.choice(_RED_CARD_JOKES))
+                self._log(state, "broma", _pick_joke(state, _RED_CARD_OWN_JOKES))
 
     def _card_random_player(
         self, state: MatchState, team: Team, label: str, *, log: bool
@@ -662,7 +735,7 @@ class RulesEngine:
                     f"({player.attribute.value} {player.value})",
                 )
                 if team is state.player:
-                    self._log(state, "broma", state.randomizer.choice(_RED_CARD_JOKES))
+                    self._log(state, "broma", _pick_joke(state, _RED_CARD_OWN_JOKES))
             return True
         return False
 

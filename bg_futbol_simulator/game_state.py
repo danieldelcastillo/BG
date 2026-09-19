@@ -324,6 +324,7 @@ class MatchState:
     red_card_resolutions: list[RedCardResolution] = field(default_factory=list)
     events: list[Event] = field(default_factory=list)
     randomizer: random.Random = field(default_factory=random.Random, repr=False)
+    used_jokes: set[str] = field(default_factory=set, repr=False)
 
     def __post_init__(self) -> None:
         if self.pressure < self.rules.pressure_floor:

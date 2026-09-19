@@ -20,14 +20,17 @@ def _simulate(
     opponent: Team,
     matches: int,
     base_seed: int,
-) -> tuple[int, int, int, int, int, int]:
-    """Ejecuta ``matches`` partidos y devuelve V/E/D, goles totales y CR robadas."""
+) -> tuple[int, int, int, int, int, int, int, int]:
+    """Ejecuta ``matches`` partidos y devuelve V/E/D, goles totales, CR robadas
+    y tarjetas rojas totales (al bot y propias)."""
 
     rng = random.Random(base_seed)
     wins = draws = losses = 0
     total_goals = 0
     total_bot_goals = 0
     total_cr_draws = 0
+    total_bot_red_cards = 0
+    total_player_red_cards = 0
     for _ in range(matches):
         seed = rng.randrange(2**63)
         state = engine.create_match_state(player, opponent, random.Random(seed))
@@ -36,13 +39,24 @@ def _simulate(
         total_goals += result.player_goals
         total_bot_goals += bot_goals
         total_cr_draws += result.cr_draws
+        total_bot_red_cards += result.red_cards
+        total_player_red_cards += result.player_red_cards
         if result.player_goals > bot_goals:
             wins += 1
         elif bot_goals > result.player_goals:
             losses += 1
         else:
             draws += 1
-    return wins, draws, losses, total_goals, total_bot_goals, total_cr_draws
+    return (
+        wins,
+        draws,
+        losses,
+        total_goals,
+        total_bot_goals,
+        total_cr_draws,
+        total_bot_red_cards,
+        total_player_red_cards,
+    )
 
 
 def main() -> None:
@@ -99,8 +113,10 @@ def main() -> None:
         "Goles jugador",
         "Goles bot",
         "CR robadas",
+        "Rojas bot",
+        "Rojas propias",
     )
-    widths = (12, 20, 11, 9, 10, 12, 15, 10, 12)
+    widths = (12, 20, 11, 9, 10, 12, 15, 10, 12, 11, 15)
     print("".join(name.ljust(width) for name, width in zip(columns, widths)))
     print("-" * sum(widths))
 
@@ -115,13 +131,15 @@ def main() -> None:
         else:
             gap_label = "0 (igual)"
 
-        wins, draws, losses, total_goals, total_bot_goals, total_cr_draws = _simulate(
+        wins, draws, losses, total_goals, total_bot_goals, total_cr_draws, total_bot_red_cards, total_player_red_cards = _simulate(
             engine, player, opponent, args.matches, args.seed
         )
         win_pct = wins / args.matches * 100
         avg_goals = total_goals / args.matches
         avg_bot_goals = total_bot_goals / args.matches
         avg_cr_draws = total_cr_draws / args.matches
+        avg_bot_red_cards = total_bot_red_cards / args.matches
+        avg_player_red_cards = total_player_red_cards / args.matches
 
         row = (
             f"{level}/{level}/{level}",
@@ -133,6 +151,8 @@ def main() -> None:
             f"{avg_goals:.2f}",
             f"{avg_bot_goals:.2f}",
             f"{avg_cr_draws:.2f}",
+            f"{avg_bot_red_cards:.2f}",
+            f"{avg_player_red_cards:.2f}",
         )
         print("".join(value.ljust(width) for value, width in zip(row, widths)))
 

@@ -14,6 +14,59 @@ from .game_state import MatchState, RedCardResolution, Team, format_lineup
 from .strategies import OneNilLowCRAI
 
 
+# Diálogos de apertura de los dos comentaristas (independientes de la
+# semilla del partido, para no alterar la reproducibilidad del motor).
+_OPENING_DIALOGUES: tuple[tuple[str, str], ...] = (
+    (
+        "¡Buenas noches y bienvenidos a este partidazo!",
+        "Se palpa la tensión en el ambiente, esto va a ser una batalla.",
+    ),
+    (
+        "Los equipos ya están sobre el terreno de juego.",
+        "Y vaya par de plantillas se han preparado para hoy.",
+    ),
+    (
+        "El árbitro ya tiene las tarjetas listas, se avecinan emociones.",
+        "Esperemos que sean más de alegría que de disgusto, compañero.",
+    ),
+    (
+        "El césped luce impecable, listo para el espectáculo.",
+        "Ojalá los nervios no le jueguen una mala pasada a ningún equipo.",
+    ),
+    (
+        "Aquí estamos, con el pulso a mil, listos para el pitido inicial.",
+        "Yo ya tengo la garganta preparada para gritar el primer gol.",
+    ),
+    (
+        "La afición ha llenado las gradas, esto promete.",
+        "Con estas plantillas, no me extrañaría un partido de infarto.",
+    ),
+)
+
+# Comentario jocoso de cierre, según el resultado final.
+_CLOSING_JOKES_WIN: tuple[str, ...] = (
+    "El rival ya está pidiendo la revancha entre lágrimas.",
+    "El bot se va a casa a repasar el manual de instrucciones.",
+    "Esto ha sido una clase magistral, apunten los alumnos.",
+    "El marcador dice más de lo que las palabras pueden explicar.",
+    "El rival necesita unas vacaciones después de esto.",
+)
+_CLOSING_JOKES_LOSS: tuple[str, ...] = (
+    "Toca revisar la cinta y aprender de los errores... y de las risas ajenas.",
+    "El técnico ya está preparando la charla motivacional de emergencia.",
+    "Al menos el buffet del descanso estuvo bueno.",
+    "Habrá que pedir explicaciones... y quizás un abrazo.",
+    "El rival se lleva los tres puntos y el equipo se lleva la lección.",
+)
+_CLOSING_JOKES_DRAW: tuple[str, ...] = (
+    "Un empate que sabe a poco para ambos banquillos.",
+    "Nadie gana, nadie pierde, todos discuten en el bar de después.",
+    "Reparto de puntos y de quejas a partes iguales.",
+    "Ni ganadores ni perdedores, solo un partido para el recuerdo... a medias.",
+    "El marcador quedó en tablas, como el humor de ambos entrenadores.",
+)
+
+
 def _effect_text(effect: Effect) -> str:
     parts: list[str] = []
     values = (
@@ -370,6 +423,11 @@ def write_match_trace(
     line("### 🎙️ ¡¡¡ARRANCA EL PARTIDO!!! 🎙️")
     line("🏆 " + "⚽" * 24 + " 🏆")
     line()
+    flavor_rng = Random(f"{seed}-flavor")
+    comment_1, comment_2 = flavor_rng.choice(_OPENING_DIALOGUES)
+    line(f"> 🎙️ **Comentarista 1**: {comment_1}")
+    line(f"> 🎙️ **Comentarista 2**: {comment_2}")
+    line()
     line(f"- 🎲 Semilla reproducible: `{seed}`")
     line(
         f"- 🧑‍🤝‍🧑 Jugador: DEF {player_team.defense} · MED {player_team.midfield} "
@@ -502,6 +560,14 @@ def write_match_trace(
     line(f"- 🏅 Alineación final (tu equipo): {format_lineup(state.player)}")
     result_icon = "🏆" if state.player_goals > state.bot_goals else "💔" if state.bot_goals > state.player_goals else "🤝"
     line(f"### {result_icon} Marcador final: Jugador {state.player_goals} – {state.bot_goals} Bot")
+    closing_pool = (
+        _CLOSING_JOKES_WIN
+        if state.player_goals > state.bot_goals
+        else _CLOSING_JOKES_LOSS
+        if state.bot_goals > state.player_goals
+        else _CLOSING_JOKES_DRAW
+    )
+    line(f"> 🎙️ **Comentario final**: {flavor_rng.choice(closing_pool)}")
     line("🏁 " + "⚽" * 24 + " 🏁")
     line()
     line("| Métrica | Resultado |")
