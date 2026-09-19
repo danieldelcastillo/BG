@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from .cards import Attribute, CardInstance, FinalizationCard, OutcomeKind, RedCard
 
@@ -161,6 +161,18 @@ class Team:
             Attribute.MED: self.midfield,
             Attribute.AT: self.attack,
         }[attribute]
+
+
+def _cloned_team(team: Team) -> Team:
+    """Copia un equipo con jugadores nuevos (mismos datos, otra identidad).
+
+    Necesario para explorar ramas especulativas sin mutar a los jugadores
+    reales del partido: ``Team`` es inmutable, pero ``Player`` no lo es.
+    """
+
+    if not team.players:
+        return team
+    return replace(team, players=tuple(replace(player) for player in team.players))
 
 
 def format_lineup(team: Team) -> str:
@@ -344,11 +356,16 @@ class MatchState:
         en su criterio de prioridad; excluirlos evita copiar estructuras cuyo
         tamaño crece durante un millón de simulaciones. Los descartes de una CC
         siguen aplicándose en la ejecución real del motor.
+
+        Los jugadores de la plantilla se clonan aparte: algunas estrategias
+        (como :class:`OneNilLowCRAI`) aplican de verdad efectos de CC sobre
+        esta copia para explorar variantes, y sin esta clonación una amarilla
+        o expulsión especulativa mutaría a los jugadores reales del partido.
         """
 
         return MatchState(
-            player=self.player,
-            opponent=self.opponent,
+            player=_cloned_team(self.player),
+            opponent=_cloned_team(self.opponent),
             rules=self.rules,
             deck=[],
             hand=list(self.hand),
