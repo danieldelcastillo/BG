@@ -685,15 +685,18 @@ class RulesEngine:
     def _recover_control_from_discard(
         self, state: MatchState, ai: "AutomaticPlayerAI", *, log: bool
     ) -> None:
-        candidates = [card for card in state.discard_pile if isinstance(card.card, ControlCard)]
-        if not candidates:
-            return
-        definition_id = ai.choose_control_recovery(state, tuple(candidates))
+        """Recupera del descarte siempre la última CC descartada (tope del mazo)."""
+
         index = next(
-            index
-            for index, candidate in enumerate(state.discard_pile)
-            if candidate.card.definition_id == definition_id
+            (
+                index
+                for index in range(len(state.discard_pile) - 1, -1, -1)
+                if isinstance(state.discard_pile[index].card, ControlCard)
+            ),
+            None,
         )
+        if index is None:
+            return
         recovered = state.discard_pile.pop(index)
         state.hand.append(recovered)
         if log:
@@ -704,12 +707,21 @@ class RulesEngine:
     def _play_random_discard_finalization(
         self, state: MatchState, ai: "AutomaticPlayerAI", *, log: bool
     ) -> None:
-        candidates = [card for card in state.discard_pile if isinstance(card.card, FinalizationCard)]
-        if not candidates:
+        """Juega desde el descarte siempre la última CF descartada (tope del mazo)."""
+
+        index = next(
+            (
+                index
+                for index in range(len(state.discard_pile) - 1, -1, -1)
+                if isinstance(state.discard_pile[index].card, FinalizationCard)
+            ),
+            None,
+        )
+        if index is None:
             return
-        finalization = state.randomizer.choice(candidates)
+        finalization = state.discard_pile.pop(index)
         if log:
-            self._log(state, "cf_aleatoria_descarte", f"Juega CF aleatoria: {finalization.card.name}")
+            self._log(state, "cf_aleatoria_descarte", f"Juega CF del descarte: {finalization.card.name}")
         # "Inmediatamente" impide jugar CC antes de esta CF extra.
         self.resolve_finalization(state, finalization, ai, log=log, return_to_discard=False)
 
