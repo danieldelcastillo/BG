@@ -154,12 +154,19 @@ class AutomaticPlayerAI:
             max(0, -effect.pressure_delta),
         )
         pressure_cost = max(0, effect.pressure_delta)
+        # Sin presión que aliviar, restar presión no aporta nada.
+        wasted_pressure_cut = (
+            max(0, -effect.pressure_delta) * 30
+            if state.pressure <= state.rules.pressure_floor
+            else 0
+        )
         return (
             effect.cf_bonus * 100
             + effect.cc_bonus * 40
             + pressure_relief * 15
             - pressure_cost * 15
             - effect.discard_top_cards * 5
+            - wasted_pressure_cut
         )
 
     @staticmethod
@@ -179,6 +186,13 @@ class AutomaticPlayerAI:
         pressure_relief = min(
             state.pressure - state.rules.pressure_floor,
             max(0, -effect.pressure_delta),
+        )
+        # Sin presión que aliviar, restar presión no aporta nada: se penaliza
+        # para que la IA prefiera otra opción si existe alguna disponible.
+        wasted_pressure_cut = (
+            max(0, -effect.pressure_delta) * 30
+            if state.pressure <= state.rules.pressure_floor
+            else 0
         )
         random_cf_value = 70 if any(
             isinstance(card.card, FinalizationCard) for card in state.discard_pile
@@ -206,4 +220,5 @@ class AutomaticPlayerAI:
             - effect.yellow_injury_rolls * 10
             - effect.red_injury_rolls * 15
             - pressure_goal_penalty
+            - wasted_pressure_cut
         )

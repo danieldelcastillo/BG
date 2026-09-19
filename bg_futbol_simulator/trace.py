@@ -120,6 +120,22 @@ def _hand_text(state: MatchState) -> str:
     return ", ".join(instance.card.name for instance in state.hand) or "—"
 
 
+_SPECTACULAR_BANNERS: dict[str, str] = {
+    "gol_jugador": "## ⚽🎉 ¡GOOOL DE TU EQUIPO! 🎉⚽",
+    "gol_bot_presion": "## ⚽💥 ¡GOL DEL BOT! 💥⚽",
+    "gol_en_contra": "## ⚽😱 ¡GOL EN CONTRA (CR)! 😱⚽",
+    "amarilla_bot": "### 🟨 ¡TARJETA AMARILLA PARA EL BOT!",
+    "amarilla_jugador": "### 🟨 ¡TARJETA AMARILLA PARA TU EQUIPO!",
+    "expulsion": "### 🟥🟥 ¡TARJETA ROJA — EXPULSIÓN!",
+}
+
+
+def _spectacular_banner(kind: str) -> str | None:
+    """Titular llamativo para goles y tarjetas, para que resalten en el informe."""
+
+    return _SPECTACULAR_BANNERS.get(kind)
+
+
 def _hand_indicator(state: MatchState) -> str:
     """Muestra el número de CC y una ficha verde por cada carta en mano."""
 
@@ -314,6 +330,11 @@ def write_match_trace(
     def audit_events() -> None:
         nonlocal event_cursor
         for event in state.events[event_cursor:]:
+            banner = _spectacular_banner(event.kind)
+            if banner:
+                line()
+                line(banner)
+                line()
             line(f"  - Registro: {event.detail}.")
         event_cursor = len(state.events)
 

@@ -503,6 +503,8 @@ class RulesEngine:
             if log:
                 self._log(state, "gol_bot_presion", "El bot marca por superar presión 9; presión a 0")
         state.player_goals += effect.goals
+        if effect.goals and log:
+            self._log(state, "gol_jugador", "¡Gol del jugador!")
         state.bot_goals_from_red_cards += effect.bot_goals
         if effect.bot_goals and log:
             self._log(state, "gol_en_contra", "Gol en contra por una CR")
