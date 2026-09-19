@@ -26,6 +26,8 @@ class SimulationStatistics:
     total_final_pressure: int = 0
     total_control_cards_left: int = 0
     total_finalizations: int = 0
+    total_cf_conditionals: int = 0
+    cf_conditional_counts: Counter[str] = field(default_factory=Counter)
     outcome_counts: Counter[str] = field(default_factory=Counter)
 
     def record(self, result: MatchResult) -> None:
@@ -46,6 +48,9 @@ class SimulationStatistics:
         self.total_control_cards_left += result.control_cards_left
         self.total_finalizations += result.finalization_count
         for resolution in result.finalizations:
+            if resolution.conditional_met:
+                self.total_cf_conditionals += 1
+                self.cf_conditional_counts[resolution.card_name] += 1
             self.outcome_counts[
                 f"{resolution.card_name} :: {resolution.outcome_name}"
             ] += 1
@@ -67,6 +72,8 @@ class SimulationStatistics:
         self.total_final_pressure += other.total_final_pressure
         self.total_control_cards_left += other.total_control_cards_left
         self.total_finalizations += other.total_finalizations
+        self.total_cf_conditionals += other.total_cf_conditionals
+        self.cf_conditional_counts.update(other.cf_conditional_counts)
         self.outcome_counts.update(other.outcome_counts)
 
     def as_dict(self) -> dict[str, object]:
@@ -100,5 +107,8 @@ class SimulationStatistics:
             "mean_final_pressure": self.total_final_pressure / denominator,
             "mean_control_cards_left": self.total_control_cards_left / denominator,
             "mean_finalizations": self.total_finalizations / denominator,
+            "total_cf_conditionals": self.total_cf_conditionals,
+            "cf_conditionals_per_match": self.total_cf_conditionals / denominator,
+            "cf_conditionals": dict(sorted(self.cf_conditional_counts.items())),
             "outcomes": dict(sorted(self.outcome_counts.items())),
         }

@@ -290,32 +290,59 @@ class RulesEngine:
         log: bool = True,
         return_to_discard: bool = True,
     ) -> FinalizationResolution:
-        """Consume los bonos +CF y aplica el resultado de la CF."""
+        """Consume el +CF actual, ejecuta primero el condicional y después la CF."""
 
         if not isinstance(instance.card, FinalizationCard):
             raise TypeError(f"{instance.card.name} no es una carta de finalización.")
-        preview = self.evaluate_finalization(state, instance.card)
+        # El +CF que ya estaba pendiente pertenece a esta CF. Lo guardamos
+        # y lo consumimos antes de ejecutar el condicional para que cualquier
+        # +CF generado por el condicional quede disponible para una CF futura.
+        current_cf_bonus = state.pending_cf_bonus
         state.pending_cf_bonus = 0
-        self._apply_full_effect(state, preview.outcome.effect, ai, log=log)
 
+        # El condicional de una CF se comprueba y ejecuta ANTES del resultado
+        # principal de la carta.
         conditional = instance.card.conditional
-        if conditional is not None:
-            conditional_met = self._rival_condition_met(state, conditional.condition)
-            if conditional_met:
-                self._apply_full_effect(state, conditional.effect, ai, log=log)
-                if log:
-                    self._log(state, "cf_condicional", conditional.label)
+        conditional_met = (
+            conditional is not None
+            and self._rival_condition_met(state, conditional.condition)
+        )
+        if conditional_met:
+            assert conditional is not None
+            if log:
+                self._log(state, "cf_condicional", conditional.label)
+            self._apply_full_effect(state, conditional.effect, ai, log=log)
+
+        # El resultado principal se determina después del condicional, usando
+        # exclusivamente el +CF que pertenecía a esta CF.
+        preview = self.evaluate_finalization_for_values(
+            state.player,
+            state.opponent,
+            state.rules,
+            current_cf_bonus,
+            state.pressure,
+            instance.card,
+        )
+        self._apply_full_effect(state, preview.outcome.effect, ai, log=log)
 
         if return_to_discard:
             state.discard_pile.append(instance)
-        state.finalizations.append(preview.resolution)
+
+        resolution = FinalizationResolution(
+            card_name=preview.resolution.card_name,
+            outcome_name=preview.resolution.outcome_name,
+            outcome_kind=preview.resolution.outcome_kind,
+            tier=preview.resolution.tier,
+            conditional_met=conditional_met,
+        )
+        state.finalizations.append(resolution)
         if log:
             self._log(
                 state,
                 "resuelve_cf",
-                f"{instance.card.name}: {preview.resolution.outcome_name}",
+                f"{instance.card.name}: {resolution.outcome_name}",
             )
-        return preview.resolution
+        return resolution
 
     def resolve_event(
         self, state: MatchState, instance: CardInstance, ai: "AutomaticPlayerAI", *, log: bool = True
@@ -344,17 +371,24 @@ class RulesEngine:
         """Resuelve una CR aplicando una única acción obligatoria más una acción
         independiente condicionada al marcador.
 
-        Se recorre la carta de arriba hacia abajo: se aplica la primera de las
-        dos acciones cuya comparación se cumpla o, si ninguna se cumple, el
-        efecto de reserva (esquina inferior derecha, sin condición). Además, y
-        de forma independiente, si se cumple la condición de marcador de la
-        esquina inferior izquierda se aplica también su efecto: una misma
-        carta puede producir así dos efectos consecutivos.
+        Primero se comprueba y aplica, de forma independiente, la condición
+        de marcador de la esquina inferior izquierda. Después se recorre la
+        carta de arriba hacia abajo: se aplica la primera de las dos acciones
+        cuya comparación se cumpla o, si ninguna se cumple, el efecto de
+        reserva (esquina inferior derecha, sin condición).
         """
 
         card = instance.card
         assert isinstance(card, RedCard)
         effective_ai = self._resolve_ai(ai)
+
+        # El condicional de la CR se comprueba y ejecuta ANTES de resolver
+        # cualquiera de las acciones principales de la carta.
+        conditional_met = self._rival_condition_met(state, card.conditional.condition)
+        if conditional_met:
+            if log:
+                self._log(state, "cr_condicion", card.conditional.label)
+            self._apply_full_effect(state, card.conditional.effect, effective_ai, log=log)
 
         applied_action_index = None
         chosen_action = None
@@ -371,12 +405,6 @@ class RulesEngine:
             self._apply_full_effect(state, card.fallback_effect, effective_ai, log=log)
             if log:
                 self._log(state, "cr_accion", f"{card.name}: acción de reserva")
-
-        conditional_met = self._rival_condition_met(state, card.conditional.condition)
-        if conditional_met:
-            self._apply_full_effect(state, card.conditional.effect, effective_ai, log=log)
-            if log:
-                self._log(state, "cr_condicion", card.conditional.label)
 
         state.red_discard_pile.append(instance)
         state.red_card_resolutions.append(

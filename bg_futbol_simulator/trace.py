@@ -42,7 +42,7 @@ def _effect_text(effect: Effect) -> str:
     if effect.discard_control_cards:
         parts.append(f"descarta {effect.discard_control_cards} CC de la mano")
     if effect.recover_control_cards:
-        parts.append(f"recupera {effect.recover_control_cards} CC del descarte")
+        parts.append("recupera 1 CC del descarte")
     if effect.play_random_discard_finalizations:
         parts.append("juega una CF aleatoria del descarte")
     if effect.draw_red_cards:
@@ -208,6 +208,19 @@ def _write_red_card_block(
 
     card = resolution.card
     print(f"- 🔴 CR ejecutada: **{card.name}**.", file=output)
+    conditional_description = (
+        f"{card.conditional.label} → {_effect_text(card.conditional.effect)}."
+    )
+    if resolution.conditional_met:
+        print(
+            f"  - **✅ Esquina inferior izquierda (independiente, antes de la acción principal): {conditional_description}**",
+            file=output,
+        )
+    else:
+        print(
+            f"  - ⬜ Esquina inferior izquierda (independiente, antes de la acción principal): {conditional_description}",
+            file=output,
+        )
     for index, action in enumerate(card.actions):
         description = (
             f"{_red_comparison_text(state, action.comparison)} → {_effect_text(action.effect)}."
@@ -223,19 +236,6 @@ def _write_red_card_block(
         print(f"  - **✅ Opción de reserva: {fallback_description}**", file=output)
     else:
         print(f"  - ⬜ Opción de reserva: {fallback_description}", file=output)
-    conditional_description = (
-        f"{card.conditional.label} → {_effect_text(card.conditional.effect)}."
-    )
-    if resolution.conditional_met:
-        print(
-            f"  - **✅ Esquina inferior izquierda (independiente): {conditional_description}**",
-            file=output,
-        )
-    else:
-        print(
-            f"  - ⬜ Esquina inferior izquierda (independiente): {conditional_description}",
-            file=output,
-        )
     summary = _summary_from_red_card_resolution(resolution)
     print(f"- {summary}", file=output)
     return summary
@@ -250,6 +250,14 @@ def _write_finalization_options(
 ) -> None:
     """Muestra los tres resultados posibles de una CF y marca el aplicado."""
 
+    if card.conditional is not None:
+        conditional_description = (
+            f"{card.conditional.label} → {_effect_text(card.conditional.effect)}."
+        )
+        print(
+            f"- 🔶 **Condicional CF (independiente, se ejecuta antes del resultado principal): {conditional_description}**",
+            file=output,
+        )
     print("- 🟧 Opciones de la CF tras jugar las CC:", file=output)
     for number, outcome in enumerate(card.outcomes, 1):
         condition = (
@@ -408,8 +416,20 @@ def write_match_trace(
             _write_finalization_options(
                 output, state, card, preview.outcome, finalization_bonus_parts
             )
-            engine.resolve_finalization(state, instance, ai)
-            line(f"- 🟧 CF aplicada: **{preview.resolution.outcome_name}** (nivel {preview.resolution.tier}).")
+            resolution = engine.resolve_finalization(state, instance, ai)
+            line(
+                f"- 🟧 CF aplicada: **{resolution.outcome_name}** "
+                f"(nivel {resolution.tier})."
+            )
+            if card.conditional is not None:
+                line(
+                    "- 🔶 Condicional CF: "
+                    + (
+                        f"**activado** — {card.conditional.label}."
+                        if resolution.conditional_met
+                        else f"no activado — {card.conditional.label}."
+                    )
+                )
             last_red_card_summary = audit_red_cards()
             turn_summary(last_red_card_summary)
             audit_events()
@@ -445,6 +465,10 @@ def write_match_trace(
     line(f"| Presión final | **{state.pressure}** |")
     line(f"| CE resueltas | **{len(state.events_resolved)}** |")
     line(f"| CF resueltas | **{len(state.finalizations)}** |")
+    line(
+        f"| Condicionales CF activados | "
+        f"**{sum(resolution.conditional_met for resolution in state.finalizations)}** |"
+    )
     line(f"| CC finales en mano | **{len(state.hand)}** |")
     line(f"| Sustituciones por lesión | **{state.injury_substitutions}** |")
 

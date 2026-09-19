@@ -120,6 +120,7 @@ def _write_summary_report(
         ("Sustituciones por lesión", statistics.total_injury_substitutions),
         ("CE resueltas", statistics.total_events),
         ("CF resueltas", statistics.total_finalizations),
+        ("Condicionales CF activados", statistics.total_cf_conditionals),
         ("Presión final acumulada", statistics.total_final_pressure),
         ("CC finales en mano", statistics.total_control_cards_left),
     )
@@ -154,6 +155,20 @@ def _write_summary_report(
     print("| --- | ---: | ---: |", file=output)
     for label, total in rows:
         print(f"| {label} | **{total}** | **{average(total):.2f}** |", file=output)
+
+    print(file=output)
+    print("## Condicionales CF", file=output)
+    print(file=output)
+    if statistics.total_cf_conditionals:
+        print("| CF | Veces activado | Media por partido |", file=output)
+        print("| --- | ---: | ---: |", file=output)
+        for card_name, total in sorted(statistics.cf_conditional_counts.items()):
+            print(
+                f"| {card_name} | **{total}** | **{average(total):.2f}** |",
+                file=output,
+            )
+    else:
+        print("- No se activó ningún `condicional_cf` en esta tanda.", file=output)
 
 
 def main() -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import unittest
 
 from bg_futbol_simulator.ai import AutomaticPlayerAI
@@ -7,7 +8,10 @@ from bg_futbol_simulator.cards import (
     CardInstance,
     ControlCard,
     EventCard,
+    Effect,
     FinalizationCard,
+    FinalizationConditional,
+    RivalCondition,
     build_match_deck,
     card_catalogue,
 )
@@ -21,6 +25,20 @@ def _state(player: Team = Team(15, 15, 15), opponent: Team = Team(15, 15, 15)) -
 
 def _instance(definition_id: str, copy_number: int = 1) -> CardInstance:
     return CardInstance(f"test-{definition_id}-{copy_number}", card_catalogue()[definition_id])
+
+
+def _finalization_with_conditional(
+    definition_id: str, condition: RivalCondition, effect: Effect
+) -> CardInstance:
+    base_card = card_catalogue()[definition_id]
+    assert isinstance(base_card, FinalizationCard)
+    conditional = FinalizationConditional(
+        label=f"Si {condition.value}",
+        condition=condition,
+        effect=effect,
+    )
+    card = replace(base_card, conditional=conditional)
+    return CardInstance(f"test-{definition_id}-conditional", card)
 
 
 class _FirstOptionAI:
@@ -104,6 +122,104 @@ class EngineTests(unittest.TestCase):
             "+1 Presión",
             self.engine.evaluate_finalization(state, one_on_one.card).resolution.outcome_name,
         )
+
+    def test_cf_conditional_is_applied_independently_when_rival_is_winning(self) -> None:
+        state = _state(player=Team(1, 1, 1), opponent=Team(30, 30, 30))
+        state.bot_goals_from_pressure = 1
+        finalization = _finalization_with_conditional(
+            "one_on_one",
+            RivalCondition.RIVAL_WINNING,
+            Effect(pressure_delta=2),
+        )
+
+        resolution = self.engine.resolve_finalization(state, finalization)
+
+        # El resultado principal sigue aplicándose y el condicional de la CF
+        # se suma de forma independiente cuando el rival va ganando.
+        self.assertEqual("Roba 1 CR", resolution.outcome_name)
+        self.assertEqual(1, state.cr_draws)
+        self.assertEqual(2, state.pressure)
+        self.assertIn("cf_condicional", [event.kind for event in state.events])
+
+
+    def test_cf_conditional_executes_before_primary_effect(self) -> None:
+        state = _state(player=Team(15, 15, 15), opponent=Team(15, 15, 16))
+        state.bot_goals_from_pressure = 1
+        state.pressure = 7
+        finalization = _finalization_with_conditional(
+            "one_on_one",
+            RivalCondition.RIVAL_WINNING,
+            Effect(pressure_delta=-4),
+        )
+
+        resolution = self.engine.resolve_finalization(state, finalization)
+
+        # Primero baja 4 la presión (7 -> 3) y después el resultado principal
+        # añade 4 (3 -> 7). Si se ejecutara al revés, el +4 provocaría un gol
+        # del bot y la presión terminaría en 0.
+        self.assertEqual(
+            "Descarta 1 CC de la mano y +4 Presión",
+            resolution.outcome_name,
+        )
+        self.assertEqual(7, state.pressure)
+        self.assertEqual(1, state.bot_goals_from_pressure)
+        kinds = [event.kind for event in state.events]
+        self.assertLess(kinds.index("cf_condicional"), kinds.index("resuelve_cf"))
+
+    def test_cr_conditional_executes_before_primary_action(self) -> None:
+        from bg_futbol_simulator.cards import RedCard, RedCardConditional, red_card_catalogue
+
+        state = _state(player=Team(15, 15, 15), opponent=Team(15, 19, 15))
+        state.bot_goals_from_pressure = 1
+        state.pressure = 5
+        base_card = red_card_catalogue()["ataque_banda"]
+        self.assertIsInstance(base_card, RedCard)
+        conditional = RedCardConditional(
+            label="Si el rival está ganando",
+            condition=RivalCondition.RIVAL_WINNING,
+            effect=Effect(pressure_delta=-4),
+        )
+        card = replace(base_card, conditional=conditional)
+        instance = CardInstance("test-ataque-banda-precondicional", card)
+
+        self.engine.resolve_red_card(state, instance)
+
+        # Primero 5 -> 1 por el condicional y luego +7 por la acción principal:
+        # el resultado es 8. Al revés, 5 -> 12 provocaría gol del bot y después
+        # la presión bajaría a 0.
+        self.assertEqual(8, state.pressure)
+        self.assertEqual(1, state.bot_goals_from_pressure)
+        kinds = [event.kind for event in state.events]
+        self.assertLess(kinds.index("cr_condicion"), kinds.index("cr_accion"))
+
+    def test_cf_conditional_is_not_applied_when_its_score_condition_is_false(self) -> None:
+        state = _state(player=Team(1, 1, 1), opponent=Team(30, 30, 30))
+        finalization = _finalization_with_conditional(
+            "one_on_one",
+            RivalCondition.RIVAL_WINNING,
+            Effect(pressure_delta=2),
+        )
+
+        resolution = self.engine.resolve_finalization(state, finalization)
+
+        self.assertEqual("Roba 1 CR", resolution.outcome_name)
+        self.assertEqual(1, state.cr_draws)
+        self.assertEqual(0, state.pressure)
+        self.assertNotIn("cf_condicional", [event.kind for event in state.events])
+
+    def test_cf_conditional_can_use_rival_losing_condition(self) -> None:
+        state = _state(player=Team(1, 1, 1), opponent=Team(30, 30, 30))
+        state.player_goals = 1
+        finalization = _finalization_with_conditional(
+            "one_on_one",
+            RivalCondition.RIVAL_LOSING,
+            Effect(pressure_delta=3),
+        )
+
+        self.engine.resolve_finalization(state, finalization)
+
+        self.assertEqual(3, state.pressure)
+        self.assertIn("cf_condicional", [event.kind for event in state.events])
 
     def test_updated_cutback_uses_midfield(self) -> None:
         state = _state(player=Team(15, 21, 99))

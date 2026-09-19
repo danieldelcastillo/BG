@@ -79,12 +79,13 @@ class ControlPlan:
 
 @dataclass(frozen=True, slots=True)
 class FinalizationResolution:
-    """Resultado que se ha seleccionado al resolver una CF."""
+    """Resultado seleccionado al resolver una CF y su condicional independiente."""
 
     card_name: str
     outcome_name: str
     outcome_kind: OutcomeKind
     tier: int
+    conditional_met: bool = False
 
 
 @dataclass(frozen=True, slots=True)
