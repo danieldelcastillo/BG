@@ -441,7 +441,7 @@ class RulesEngine:
                 ),
                 event_remaining=sum(isinstance(i.card, EventCard) for i in state.deck),
                 discard_remaining=len(state.discard_pile),
-                red_available=len(state.red_deck) + len(state.red_discard_pile),
+                red_available=len(state.red_deck),
             )
         )
 
@@ -456,15 +456,10 @@ class RulesEngine:
         return rival_value > player_value
 
     def draw_red_card(self, state: MatchState, *, log: bool = True) -> CardInstance | None:
-        """Roba la siguiente CR, reciclando su descarte si el mazo está vacío."""
+        """Roba la siguiente CR del mazo; una vez usada queda fuera del juego."""
 
         if not state.red_deck:
-            if not state.red_discard_pile:
-                return None
-            state.red_deck, state.red_discard_pile = state.red_discard_pile, []
-            state.randomizer.shuffle(state.red_deck)
-            if log:
-                self._log(state, "reciclaje_cr", "Se baraja el descarte de CR para formar un nuevo mazo")
+            return None
         instance = state.red_deck.pop()
         if log:
             self._log(state, "roba_cr", f"Roba CR: {instance.card.name}")

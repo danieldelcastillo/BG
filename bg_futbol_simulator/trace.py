@@ -135,7 +135,7 @@ def _deck_remaining_text(state: MatchState) -> str:
     finalization = sum(isinstance(instance.card, FinalizationCard) for instance in state.deck)
     event = sum(isinstance(instance.card, EventCard) for instance in state.deck)
     discard = len(state.discard_pile)
-    red = len(state.red_deck) + len(state.red_discard_pile)
+    red = len(state.red_deck)
     return (
         f"mazo restante: {control} CC, {finalization} CF y {event} CE; "
         f"descarte: {discard}; CR disponibles: {red}"
