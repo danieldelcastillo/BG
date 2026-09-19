@@ -11,7 +11,7 @@ import random
 
 from .ai import AutomaticPlayerAI
 from .engine import RulesEngine
-from .game_state import MatchResult, Team, format_lineup, generate_players
+from .game_state import MatchResult, Team
 
 
 def _simulate(
@@ -135,10 +135,6 @@ def main() -> None:
             f"{avg_cr_draws:.2f}",
         )
         print("".join(value.ljust(width) for value, width in zip(row, widths)))
-
-        sample_players = generate_players(level, level, level, random.Random(args.seed))
-        sample_team = Team(level, level, level, players=sample_players)
-        print(f"  Alineación de ejemplo: {format_lineup(sample_team)}")
 
     print("=" * 88)
 
