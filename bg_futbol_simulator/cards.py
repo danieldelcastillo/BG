@@ -282,7 +282,7 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Comparison(Attribute.MED, Attribute.MED, 0),
             Effect(pressure_delta=2, cf_bonus=4),
             Comparison(Attribute.DEF, Attribute.MED, 1),
-            Effect(yellow_cards=1, cf_bonus=5),
+            Effect(player_yellow_cards=1, cf_bonus=5),
         ),
         _control(
             "wing_play",
