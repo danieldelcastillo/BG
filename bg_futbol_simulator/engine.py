@@ -41,6 +41,44 @@ if TYPE_CHECKING:
     from .ai import AutomaticPlayerAI
 
 
+# Frases al recibir un gol del bot (por presión o en contra por una CR).
+_GOAL_AGAINST_JOKES: tuple[str, ...] = (
+    "El portero estaba pidiendo un autógrafo al balón.",
+    "La defensa se abrió como el Mar Rojo.",
+    "Ese gol lo vio hasta tu abuela desde el sofá.",
+    "El VAR ni se molestó en revisarlo, fue tan claro.",
+    "Tu defensa central perseguía una mariposa.",
+    "El portero se giró a saludar a la grada justo a tiempo... de ver el gol.",
+    "Ese balón entró más fácil que en un entrenamiento de porteros.",
+    "La defensa jugó al 'después de ti' con el delantero rival.",
+    "Alguien avise al gimnasio: la defensa necesita cardio.",
+    "El larguero se apiadó y dejó pasar el balón sin oponer resistencia.",
+    "Ese gol entró más limpio que la ropa recién planchada.",
+    "El portero estaba revisando el móvil.",
+    "La defensa se quedó posando para la foto del equipo.",
+    "Ese gol tuvo más aplausos del banquillo rival que del tuyo.",
+    "El portero pensó que era un tiro de esquina y no uno a puerta.",
+)
+
+# Frases al recibir una tarjeta roja propia (directa o por doble amarilla).
+_RED_CARD_JOKES: tuple[str, ...] = (
+    "El árbitro sacó la roja más rápido que un mesero trayendo la cuenta.",
+    "Directo a la ducha, sin pasar por el banquillo.",
+    "Esa entrada se vio hasta en la repetición en cámara súper lenta... tres veces.",
+    "El árbitro ni dudó: roja directa y silbato al máximo volumen.",
+    "Alguien confundió el partido con un rodeo.",
+    "El césped tembló con esa patada.",
+    "Esa fue una tarjeta roja tan roja que se veía desde el espacio.",
+    "El jugador se fue pensando en qué le va a decir al técnico.",
+    "El árbitro sacó la tarjeta con más ganas que un niño abriendo regalos.",
+    "Esa expulsión ya es tema de conversación en el vestuario.",
+    "El jugador se despidió del partido antes de tiempo, como quien se va sin pagar la cuenta.",
+    "Esa entrada mereció hasta aplausos... del árbitro sacando la tarjeta.",
+    "El jugador se fue camino al vestuario contando ovejas.",
+    "Esa tarjeta roja se vio venir desde el calentamiento.",
+)
+
+
 class IllegalPlay(ValueError):
     """La IA o un cliente intentó ejecutar una jugada que no es legal."""
 
@@ -232,10 +270,24 @@ class RulesEngine:
     def execute_control_plan(
         self, state: MatchState, plan: ControlPlan, *, log: bool = True
     ) -> None:
-        """Ejecuta la secuencia ordenada de CC elegida por la IA."""
+        """Ejecuta la secuencia ordenada de CC elegida por la IA.
+
+        Si una expulsión de jugador entre CC deja de cumplirse una
+        comparación ya planificada (la plantilla cambia entre el cálculo del
+        plan y su ejecución), se detiene el resto del plan en vez de fallar.
+        """
 
         for play in plan.plays:
-            self.apply_control_play(state, play, log=log)
+            try:
+                self.apply_control_play(state, play, log=log)
+            except IllegalPlay:
+                if log:
+                    self._log(
+                        state,
+                        "plan_cc_obsoleto",
+                        "Una expulsión cambió el equipo a mitad de plan; se detiene el resto de CC",
+                    )
+                break
 
     def discard_control_from_hand(
         self, state: MatchState, definition_id: str, *, log: bool = True
@@ -502,12 +554,14 @@ class RulesEngine:
             state.bot_goals_from_pressure += 1
             if log:
                 self._log(state, "gol_bot_presion", "El bot marca por superar presión 9; presión a 0")
+                self._log(state, "broma", state.randomizer.choice(_GOAL_AGAINST_JOKES))
         state.player_goals += effect.goals
         if effect.goals and log:
             self._log(state, "gol_jugador", "¡Gol del jugador!")
         state.bot_goals_from_red_cards += effect.bot_goals
         if effect.bot_goals and log:
             self._log(state, "gol_en_contra", "Gol en contra por una CR")
+            self._log(state, "broma", state.randomizer.choice(_GOAL_AGAINST_JOKES))
         for _ in range(effect.yellow_cards):
             self._bot_yellow_card(state, log=log)
         for _ in range(effect.red_cards):
@@ -574,6 +628,8 @@ class RulesEngine:
                 f"Roja directa: expulsado un jugador de {label} "
                 f"({player.attribute.value} {player.value})",
             )
+            if team is state.player:
+                self._log(state, "broma", state.randomizer.choice(_RED_CARD_JOKES))
 
     def _card_random_player(
         self, state: MatchState, team: Team, label: str, *, log: bool
@@ -605,6 +661,8 @@ class RulesEngine:
                     f"Segunda amarilla: expulsado un jugador de {label} "
                     f"({player.attribute.value} {player.value})",
                 )
+                if team is state.player:
+                    self._log(state, "broma", state.randomizer.choice(_RED_CARD_JOKES))
             return True
         return False
 

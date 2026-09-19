@@ -332,6 +332,9 @@ def write_match_trace(
     def audit_events() -> None:
         nonlocal event_cursor
         for event in state.events[event_cursor:]:
+            if event.kind == "broma":
+                line(f"  - 💬 _{event.detail}_")
+                continue
             banner = _spectacular_banner(event.kind)
             if banner:
                 line()
@@ -441,6 +444,14 @@ def write_match_trace(
                 control = held.card
                 assert isinstance(control, ControlCard)
                 option = control.option(play.option_key)
+                if option.comparison is not None and not engine.comparison_succeeds(
+                    state, option.comparison, state.pending_cc_bonus
+                ):
+                    line(
+                        f"- 🟩 CC {position}: **{control.name} — {option.label}** ya no es válida "
+                        "(una expulsión cambió el equipo a mitad de plan); se detiene el resto de CC."
+                    )
+                    break
                 comparison = (
                     f" Comparación: {_comparison_text(state, option.comparison, state.pending_cc_bonus)}; superada."
                     if option.comparison is not None
