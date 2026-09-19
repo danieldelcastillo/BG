@@ -14,57 +14,57 @@ from .game_state import MatchState, RedCardResolution, Team, format_lineup
 from .strategies import OneNilLowCRAI
 
 
-# Diálogos de apertura de los dos comentaristas, con desmadre de cómic
-# de gags disparatados (independientes de la semilla del partido, para no
-# alterar la reproducibilidad del motor).
+# Diálogos de apertura de los dos comentaristas, humor futbolístico puro
+# (independientes de la semilla del partido, para no alterar la
+# reproducibilidad del motor).
 _OPENING_DIALOGUES: tuple[tuple[str, str], ...] = (
     (
-        "¡Buenas noches! Bienvenidos a un partido con más acción que una peli de espías.",
-        "Esperemos que no acabe todo en explosiones, como de costumbre.",
+        "¡Buenas noches y bienvenidos a este partidazo!",
+        "Se palpa la tensión en el ambiente, esto va a ser una batalla.",
     ),
     (
-        "Los equipos ya están sobre el césped, listos para el lío.",
-        "Con esta plantilla, no me extrañaría ver algún que otro pastelazo.",
+        "Los equipos ya están sobre el césped, calentando para el pitido inicial.",
+        "Con estas plantillas, promete ser un partido de infarto.",
     ),
     (
-        "El árbitro ya tiene las tarjetas preparadas, como quien prepara collejas.",
-        "Esperemos que hoy nadie active el traje camuflaje por error.",
+        "El árbitro ya revisa las alineaciones antes de empezar.",
+        "Esperemos que hoy el VAR no tenga mucho trabajo.",
     ),
     (
-        "El césped luce impecable, ni rastro de rastrillos escondidos.",
-        "Eso espero, porque como alguien pise uno, esto se convierte en un episodio entero.",
+        "El césped luce impecable, listo para el espectáculo.",
+        "Ojalá los nervios no jueguen una mala pasada a ningún equipo.",
     ),
     (
-        "Aquí estamos, con más nervios que un inventor esperando la nómina.",
-        "Y yo con la garganta lista para gritar '¡GOOOL!' o '¡CATAPLOF!', lo que toque primero.",
+        "Aquí estamos, con el pulso a mil, listos para el pitido inicial.",
+        "Yo ya tengo la garganta preparada para gritar el primer gol.",
     ),
     (
-        "La afición ha llenado las gradas, esto promete más caos que una oficina un lunes por la mañana.",
-        "Con estas plantillas, no descarto que el partido acabe con alguien esposado a la portería.",
+        "La afición ha llenado las gradas, esto promete un gran ambiente.",
+        "Con estas plantillas, no me extrañaría un partido de infarto hasta el final.",
     ),
 )
 
 # Comentario jocoso de cierre, según el resultado final.
 _CLOSING_JOKES_WIN: tuple[str, ...] = (
-    "El rival se va a casa con más chichones que tras un torpe día de trabajo.",
-    "El entrenador estaría orgulloso... o gritando de la emoción, que en él es lo mismo.",
-    "Esto ha sido una lección magistral, con final de traca incluido.",
-    "El marcador dice más que mil informes técnicos.",
-    "El rival necesita un informe médico después de esta paliza.",
+    "El rival ya está pidiendo la revancha para la próxima jornada.",
+    "El equipo se lleva los tres puntos con nota de sobresaliente.",
+    "Esto ha sido una lección de manual de cómo se gana un partido.",
+    "El marcador habla por sí solo, no hacen falta más palabras.",
+    "El rival necesita revisar bien los vídeos antes del próximo cruce.",
 )
 _CLOSING_JOKES_LOSS: tuple[str, ...] = (
-    "Toca revisar la cinta y aprender, como quien tropieza dos veces con la misma piedra.",
-    "El técnico ya prepara la bronca de toda la vida.",
-    "Al menos el bocadillo del descanso sabía a gloria.",
-    "Esto ha sido un pastelazo en toda regla, y no de los buenos.",
-    "El rival se lleva los tres puntos y el equipo se lleva el chichón.",
+    "Toca revisar la cinta y aprender de los errores de hoy.",
+    "El técnico ya prepara la charla motivacional para el próximo partido.",
+    "Al menos el ambiente en la grada estuvo a la altura.",
+    "Habrá que remar duro en el entrenamiento para levantar esta derrota.",
+    "El rival se lleva los tres puntos, el equipo se lleva la lección.",
 )
 _CLOSING_JOKES_DRAW: tuple[str, ...] = (
-    "Un empate que sabe a poco, como un invento a medio terminar.",
-    "Nadie gana, nadie pierde, pero todos salen con alguna magulladura.",
-    "Reparto de puntos y de collejas a partes iguales.",
-    "Ni ganadores ni perdedores, solo un lío de proporciones épicas.",
-    "El marcador quedó en tablas, como los inventos que ni explotan ni funcionan.",
+    "Un empate que sabe a poco para ambos banquillos.",
+    "Reparto de puntos justo tras un partido muy disputado.",
+    "Ni ganadores ni perdedores, solo un partido para el recuerdo.",
+    "El marcador quedó en tablas, como el guion de un partido muy cerrado.",
+    "Un punto que sabe a victoria para unos y a derrota para otros.",
 )
 
 
@@ -190,6 +190,28 @@ def _spectacular_banner(kind: str) -> str | None:
     """Titular llamativo para goles y tarjetas, para que resalten en el informe."""
 
     return _SPECTACULAR_BANNERS.get(kind)
+
+
+_SUMMARY_EVENT_LABELS: dict[str, str] = {
+    "gol_jugador": "⚽ Gol del jugador",
+    "gol_bot_presion": "⚽ Gol del bot (presión)",
+    "gol_en_contra": "⚽ Gol en contra (CR)",
+    "amarilla_bot": "🟨 Amarilla al rival",
+    "amarilla_jugador": "🟨 Amarilla propia",
+    "expulsion": "🟥 Expulsión",
+}
+
+
+def _chronological_summary_lines(state: MatchState) -> list[str]:
+    """Resumen ordenado por turno de goles, tarjetas y expulsiones del partido."""
+
+    lines: list[str] = []
+    for event in state.events:
+        label = _SUMMARY_EVENT_LABELS.get(event.kind)
+        if label is None:
+            continue
+        lines.append(f"- Turno {event.turn}: **{label}** — {event.detail}.")
+    return lines
 
 
 def _hand_indicator(state: MatchState) -> str:
@@ -399,6 +421,10 @@ def write_match_trace(
                         f"### 📢 MARCADOR: Jugador **{state.player_goals}** – "
                         f"**{state.bot_goals}** Bot 📢"
                     )
+                if event.kind == "expulsion" and "tu equipo" in event.detail:
+                    active = sum(1 for player in state.player.players if not player.sent_off)
+                    total = len(state.player.players)
+                    line(f"### 🧍 Jugadores en el campo (tu equipo): **{active}/{total}**")
                 line("---")
                 line()
             line(f"  - Registro: {event.detail}.")
@@ -590,6 +616,16 @@ def write_match_trace(
     )
     line(f"| CC finales en mano | **{len(state.hand)}** |")
     line(f"| Sustituciones por lesión | **{state.injury_substitutions}** |")
+
+    line()
+    line("## 📜 Resumen cronológico")
+    line()
+    summary_lines = _chronological_summary_lines(state)
+    if summary_lines:
+        for summary_line in summary_lines:
+            line(summary_line)
+    else:
+        line("- Sin goles, tarjetas ni expulsiones en este partido.")
 
 
 def main() -> None:
