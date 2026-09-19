@@ -121,13 +121,15 @@ def _hand_text(state: MatchState) -> str:
 
 
 _SPECTACULAR_BANNERS: dict[str, str] = {
-    "gol_jugador": "## ⚽🎉 ¡GOOOL DE TU EQUIPO! 🎉⚽",
-    "gol_bot_presion": "## ⚽💥 ¡GOL DEL BOT! 💥⚽",
-    "gol_en_contra": "## ⚽😱 ¡GOL EN CONTRA (CR)! 😱⚽",
+    "gol_jugador": "## 🏆⚽🎉🎊 ¡¡¡GOOOOOOL DE TU EQUIPO!!! 🎊🎉⚽🏆",
+    "gol_bot_presion": "## 🚨⚽💥 ¡¡¡GOOOOOOL DEL BOT!!! 💥⚽🚨",
+    "gol_en_contra": "## 🚨⚽😱 ¡¡¡GOL EN CONTRA (CR)!!! 😱⚽🚨",
     "amarilla_bot": "### 🟨 ¡TARJETA AMARILLA PARA EL BOT!",
     "amarilla_jugador": "### 🟨 ¡TARJETA AMARILLA PARA TU EQUIPO!",
     "expulsion": "### 🟥🟥 ¡TARJETA ROJA — EXPULSIÓN!",
 }
+
+_GOAL_KINDS = frozenset(("gol_jugador", "gol_bot_presion", "gol_en_contra"))
 
 
 def _spectacular_banner(kind: str) -> str | None:
@@ -333,7 +335,14 @@ def write_match_trace(
             banner = _spectacular_banner(event.kind)
             if banner:
                 line()
+                line("---")
                 line(banner)
+                if event.kind in _GOAL_KINDS:
+                    line(
+                        f"### 📢 MARCADOR: Jugador **{state.player_goals}** – "
+                        f"**{state.bot_goals}** Bot 📢"
+                    )
+                line("---")
                 line()
             line(f"  - Registro: {event.detail}.")
         event_cursor = len(state.events)
