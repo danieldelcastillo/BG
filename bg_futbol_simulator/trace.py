@@ -134,8 +134,12 @@ def _deck_remaining_text(state: MatchState) -> str:
     control = sum(isinstance(instance.card, ControlCard) for instance in state.deck)
     finalization = sum(isinstance(instance.card, FinalizationCard) for instance in state.deck)
     event = sum(isinstance(instance.card, EventCard) for instance in state.deck)
+    discard = len(state.discard_pile)
     red = len(state.red_deck) + len(state.red_discard_pile)
-    return f"mazo restante: {control} CC, {finalization} CF y {event} CE; CR disponibles: {red}"
+    return (
+        f"mazo restante: {control} CC, {finalization} CF y {event} CE; "
+        f"descarte: {discard}; CR disponibles: {red}"
+    )
 
 
 def _summary_text(
@@ -180,7 +184,7 @@ def _summary_from_red_card_resolution(resolution: RedCardResolution) -> str:
     deck_remaining_text = (
         f"mazo restante: {resolution.control_remaining} CC, "
         f"{resolution.finalization_remaining} CF y {resolution.event_remaining} CE; "
-        f"CR disponibles: {resolution.red_available}"
+        f"descarte: {resolution.discard_remaining}; CR disponibles: {resolution.red_available}"
     )
     return _summary_text(
         resolution.player_goals,

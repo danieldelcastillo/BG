@@ -286,6 +286,7 @@ class RedCardResolution:
     control_remaining: int
     finalization_remaining: int
     event_remaining: int
+    discard_remaining: int
     red_available: int
 
 

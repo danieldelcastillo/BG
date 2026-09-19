@@ -440,6 +440,7 @@ class RulesEngine:
                     isinstance(i.card, FinalizationCard) for i in state.deck
                 ),
                 event_remaining=sum(isinstance(i.card, EventCard) for i in state.deck),
+                discard_remaining=len(state.discard_pile),
                 red_available=len(state.red_deck) + len(state.red_discard_pile),
             )
         )
