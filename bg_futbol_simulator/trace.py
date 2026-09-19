@@ -362,23 +362,26 @@ def write_match_trace(
         if summary != last_red_card_summary:
             line(f"- {summary}")
 
-    line("# Partido simulado paso a paso — BG FÚTBOL")
+    line("🏆 " + "⚽" * 24 + " 🏆")
+    line("# 🔥🎉 B G   F Ú T B O L 🎉🔥")
+    line("### 🎙️ ¡¡¡ARRANCA EL PARTIDO!!! 🎙️")
+    line("🏆 " + "⚽" * 24 + " 🏆")
     line()
-    line(f"- Semilla reproducible: `{seed}`")
+    line(f"- 🎲 Semilla reproducible: `{seed}`")
     line(
-        f"- Jugador: DEF {player_team.defense} · MED {player_team.midfield} "
+        f"- 🧑‍🤝‍🧑 Jugador: DEF {player_team.defense} · MED {player_team.midfield} "
         f"· AT {player_team.attack}"
     )
-    line(f"- Alineación (tu equipo): {format_lineup(state.player)}")
+    line(f"- 📋 Alineación (tu equipo): {format_lineup(state.player)}")
     line(
-        f"- Bot: DEF {opponent_team.defense} · MED {opponent_team.midfield} "
+        f"- 🤖 Bot: DEF {opponent_team.defense} · MED {opponent_team.midfield} "
         f"· AT {opponent_team.attack}"
     )
-    line("- Mazo: 28 CC, 12 CF y 10 CE; mazo de CR aparte: 16 (8 tipos × 2)")
-    line(f"- Mano inicial: 0 CC; límite: {state.rules.max_control_hand_size} CC")
-    line("- Gol del bot: al superar presión 9, la presión vuelve a 0")
+    line("- 🃏 Mazo: 28 CC, 12 CF y 10 CE; mazo de CR aparte: 16 (8 tipos × 2)")
+    line(f"- ✋ Mano inicial: 0 CC; límite: {state.rules.max_control_hand_size} CC")
+    line("- 📈 Gol del bot: al superar presión 9, la presión vuelve a 0")
     line(
-        "- Estrategia: "
+        "- 🧠 Estrategia: "
         + (
             "buscar 1–0; conservar CC hasta 2 CR y después minimizar CR"
             if strategy == "one_nil_low_cr"
@@ -482,11 +485,13 @@ def write_match_trace(
         audit_events()
 
     line()
-    line("## Resultado final")
+    line("🏁 " + "⚽" * 24 + " 🏁")
+    line("## 🎉🏆 ¡¡¡FINAL DEL PARTIDO!!! 🏆🎉")
     line()
-    line(f"- Alineación final (tu equipo): {format_lineup(state.player)}")
+    line(f"- 🏅 Alineación final (tu equipo): {format_lineup(state.player)}")
     result_icon = "🏆" if state.player_goals > state.bot_goals else "💔" if state.bot_goals > state.player_goals else "🤝"
     line(f"### {result_icon} Marcador final: Jugador {state.player_goals} – {state.bot_goals} Bot")
+    line("🏁 " + "⚽" * 24 + " 🏁")
     line()
     line("| Métrica | Resultado |")
     line("| --- | ---: |")

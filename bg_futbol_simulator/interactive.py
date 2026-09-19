@@ -31,11 +31,14 @@ def _ask_nonnegative(prompt: str) -> int:
 
 
 def _ask_team(label: str) -> Team:
-    print(f"\nAtributos de {label}:")
+    print()
+    print("🏟️  " + "═" * 44)
+    print(f"   ⚔️  ATRIBUTOS DE {label.upper()} ⚔️")
+    print("═" * 46)
     return Team(
-        defense=_ask_nonnegative("  DEF: "),
-        midfield=_ask_nonnegative("  MED: "),
-        attack=_ask_nonnegative("  AT: "),
+        defense=_ask_nonnegative("   🛡️  DEF (defensa): "),
+        midfield=_ask_nonnegative("   🎯 MED (mediocampo): "),
+        attack=_ask_nonnegative("   🔥 AT  (ataque): "),
     )
 
 
@@ -174,9 +177,10 @@ def _write_summary_report(
 def main() -> None:
     """Muestra el menú, crea el informe y abre su carpeta en el Explorador."""
 
-    print("=" * 58)
-    print("      BG FÚTBOL — simulación de un partido")
-    print("=" * 58)
+    print("🏆" + "⚽" * 26 + "🏆")
+    print("      🔥🎉  B G   F Ú T B O L  🎉🔥")
+    print("        🎙️  simulación de un partido 🎙️")
+    print("🏆" + "⚽" * 26 + "🏆")
     try:
         player = _ask_team("tu equipo")
         opponent = _ask_team("el bot")
