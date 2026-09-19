@@ -8,24 +8,188 @@ from dataclasses import dataclass, field
 from .cards import Attribute, CardInstance, FinalizationCard, OutcomeKind, RedCard
 
 
+@dataclass(slots=True)
+class Player:
+    """Jugador de campo con un único atributo (DEF, MED o AT).
+
+    ``value`` es su aportación individual a ese atributo del equipo.
+    ``sent_off`` se activa con una tarjeta roja directa o con la segunda
+    amarilla del partido; a partir de ese momento deja de sumar al equipo.
+    """
+
+    attribute: Attribute
+    value: int
+    yellow_cards: int = 0
+    sent_off: bool = False
+
+
+PLAYER_MIN_LEVEL = 1
+PLAYER_MAX_LEVEL = 9
+
+
+def _random_partition(
+    total: int,
+    parts: int,
+    rng: random.Random,
+    *,
+    min_value: int = PLAYER_MIN_LEVEL,
+    max_value: int = PLAYER_MAX_LEVEL,
+) -> list[int]:
+    """Reparte ``total`` en ``parts`` niveles al azar, entre ``min_value`` y ``max_value``.
+
+    Si el reparto exacto no cabe en ese rango (caso extremo con totales fuera
+    de lo habitual), se relaja el límite mínimo indispensable para que la
+    suma siga cuadrando en lugar de fallar.
+    """
+
+    if parts <= 0:
+        raise ValueError("El número de jugadores debe ser mayor que cero.")
+    lo, hi = min_value, max_value
+    if parts * lo > total:
+        lo = total // parts
+    if parts * hi < total:
+        hi = -(-total // parts)
+    values = [lo] * parts
+    remaining = total - lo * parts
+    while remaining > 0:
+        index = rng.randrange(parts)
+        if values[index] < hi:
+            values[index] += 1
+            remaining -= 1
+    rng.shuffle(values)
+    return values
+
+
+# Únicas formas de repartir 7 jugadores en 3 categorías con máximo 3 por una.
+_CATEGORY_SHAPES: tuple[tuple[int, int, int], ...] = (
+    (3, 3, 1),
+    (3, 1, 3),
+    (1, 3, 3),
+    (3, 2, 2),
+    (2, 3, 2),
+    (2, 2, 3),
+)
+
+
+def _feasible_counts(total: int) -> set[int]:
+    """Cuenta de jugadores (1-3) con los que ``total`` cabe en niveles 1-9."""
+
+    return {
+        count
+        for count in (1, 2, 3)
+        if count * PLAYER_MIN_LEVEL <= total <= count * PLAYER_MAX_LEVEL
+    }
+
+
+def _shape_cost(total: int, count: int) -> int:
+    """Cu\u00e1nto se sale ``total`` del rango 1-9 por jugador con ``count`` jugadores."""
+
+    return max(0, total - count * PLAYER_MAX_LEVEL, count * PLAYER_MIN_LEVEL - total)
+
+
+def generate_players(
+    defense: int, midfield: int, attack: int, rng: random.Random
+) -> tuple[Player, ...]:
+    """Genera los 7 jugadores de un equipo (cada uno con un único atributo).
+
+    Ninguna categoría tiene más de 3 jugadores; el valor de cada uno se
+    reparte al azar, siempre entre nivel 1 y nivel 9, de forma que la suma
+    por categoría coincide con el total del equipo (DEF, MED o AT). Si algún
+    total es tan extremo que ninguna combinación cabe perfectamente entre 1
+    y 9, se elige la combinación que menos se sale de ese rango.
+    """
+
+    feasible_def = _feasible_counts(defense)
+    feasible_med = _feasible_counts(midfield)
+    feasible_at = _feasible_counts(attack)
+    valid_shapes = [
+        shape
+        for shape in _CATEGORY_SHAPES
+        if shape[0] in feasible_def and shape[1] in feasible_med and shape[2] in feasible_at
+    ]
+    if valid_shapes:
+        chosen_shapes = valid_shapes
+    else:
+        costs = [
+            _shape_cost(defense, shape[0]) + _shape_cost(midfield, shape[1]) + _shape_cost(attack, shape[2])
+            for shape in _CATEGORY_SHAPES
+        ]
+        best_cost = min(costs)
+        chosen_shapes = [
+            shape for shape, cost in zip(_CATEGORY_SHAPES, costs) if cost == best_cost
+        ]
+    def_count, med_count, at_count = rng.choice(chosen_shapes)
+    players: list[Player] = []
+    for attribute, total, count in (
+        (Attribute.DEF, defense, def_count),
+        (Attribute.MED, midfield, med_count),
+        (Attribute.AT, attack, at_count),
+    ):
+        for value in _random_partition(total, count, rng):
+            players.append(Player(attribute=attribute, value=value))
+    return tuple(players)
+
+
 @dataclass(frozen=True, slots=True)
 class Team:
-    """Atributos permanentes de un equipo."""
+    """Atributos permanentes de un equipo y, opcionalmente, su plantilla de 7 jugadores.
+
+    ``defense``/``midfield``/``attack`` son los totales nominales (los que se
+    usan para configurar el partido). Cuando ``players`` está poblado,
+    :meth:`value` refleja el total en vivo: los jugadores expulsados dejan de
+    sumar a su categoría.
+    """
 
     defense: int
     midfield: int
     attack: int
+    players: tuple[Player, ...] = ()
 
     def __post_init__(self) -> None:
         if min(self.defense, self.midfield, self.attack) < 0:
             raise ValueError("DEF, MED y AT no pueden ser negativos.")
 
     def value(self, attribute: Attribute) -> int:
+        if self.players:
+            return sum(
+                player.value
+                for player in self.players
+                if player.attribute is attribute and not player.sent_off
+            )
         return {
             Attribute.DEF: self.defense,
             Attribute.MED: self.midfield,
             Attribute.AT: self.attack,
         }[attribute]
+
+
+def format_lineup(team: Team) -> str:
+    """Muestra la alineación de 7 jugadores agrupada por atributo.
+
+    Los expulsados aparecen tachados; no dejan de listarse para que se vea
+    quién falta respecto al inicio del partido.
+    """
+
+    if not team.players:
+        return "sin plantilla individual"
+    groups: dict[Attribute, list[Player]] = {
+        Attribute.DEF: [],
+        Attribute.MED: [],
+        Attribute.AT: [],
+    }
+    for player in team.players:
+        groups[player.attribute].append(player)
+    parts: list[str] = []
+    for attribute in (Attribute.DEF, Attribute.MED, Attribute.AT):
+        members = sorted(groups[attribute], key=lambda p: p.value, reverse=True)
+        if not members:
+            continue
+        values = ", ".join(
+            f"~~{member.value}~~" if member.sent_off else str(member.value)
+            for member in members
+        )
+        parts.append(f"{attribute.value} ({len(members)}): {values}")
+    return " · ".join(parts)
 
 
 @dataclass(frozen=True, slots=True)

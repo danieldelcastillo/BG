@@ -10,7 +10,7 @@ from typing import TextIO
 from .ai import AutomaticPlayerAI
 from .cards import Comparison, ControlCard, Effect, EventCard, FinalizationCard, RedComparison
 from .engine import RulesEngine
-from .game_state import MatchState, RedCardResolution, Team
+from .game_state import MatchState, RedCardResolution, Team, format_lineup
 from .strategies import OneNilLowCRAI
 
 
@@ -335,6 +335,7 @@ def write_match_trace(
         f"- Jugador: DEF {player_team.defense} · MED {player_team.midfield} "
         f"· AT {player_team.attack}"
     )
+    line(f"- Alineación (tu equipo): {format_lineup(state.player)}")
     line(
         f"- Bot: DEF {opponent_team.defense} · MED {opponent_team.midfield} "
         f"· AT {opponent_team.attack}"
@@ -449,6 +450,7 @@ def write_match_trace(
     line()
     line("## Resultado final")
     line()
+    line(f"- Alineación final (tu equipo): {format_lineup(state.player)}")
     result_icon = "🏆" if state.player_goals > state.bot_goals else "💔" if state.bot_goals > state.player_goals else "🤝"
     line(f"### {result_icon} Marcador final: Jugador {state.player_goals} – {state.bot_goals} Bot")
     line()

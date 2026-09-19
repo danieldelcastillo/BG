@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from .cards import (
@@ -33,6 +33,7 @@ from .game_state import (
     MatchState,
     RedCardResolution,
     Team,
+    generate_players,
     result_from_state,
 )
 
@@ -72,6 +73,7 @@ class RulesEngine:
         """Crea y baraja el mazo definitivo para un partido."""
 
         active_rules = rules or MatchRules()
+        player = self._with_players(player, rng)
         deck = build_match_deck()
         deck.extend(self._balance_cards(player, opponent))
         rng.shuffle(deck)
@@ -86,6 +88,18 @@ class RulesEngine:
             pressure=active_rules.initial_pressure,
             randomizer=rng,
         )
+
+    @staticmethod
+    def _with_players(team: Team, rng: random.Random) -> Team:
+        """Genera la plantilla de 7 jugadores del equipo si aún no la tiene.
+
+        El bot no usa plantilla: sus tarjetas se resuelven con la mecánica de
+        dado propia, no expulsando jugadores concretos.
+        """
+
+        if team.players:
+            return team
+        return replace(team, players=generate_players(team.defense, team.midfield, team.attack, rng))
 
     @staticmethod
     def _balance_cards(player: Team, opponent: Team) -> list[CardInstance]:
@@ -496,14 +510,105 @@ class RulesEngine:
         state.bot_goals_from_red_cards += effect.bot_goals
         if effect.bot_goals and log:
             self._log(state, "gol_en_contra", "Gol en contra por una CR")
-        state.yellow_cards += effect.yellow_cards
-        state.red_cards += effect.red_cards
-        state.player_yellow_cards += effect.player_yellow_cards
-        state.player_red_cards += effect.player_red_cards
+        for _ in range(effect.yellow_cards):
+            self._bot_yellow_card(state, log=log)
+        for _ in range(effect.red_cards):
+            state.red_cards += 1
+            self._apply_bot_red_card_penalty(state, log=log)
+        for _ in range(effect.player_yellow_cards):
+            state.player_yellow_cards += 1
+            if self._card_random_player(state, state.player, "tu equipo", log=log):
+                state.player_red_cards += 1
+        for _ in range(effect.player_red_cards):
+            state.player_red_cards += 1
+            self._send_off_random_player(state, state.player, "tu equipo", log=log)
         self._roll_injuries(state, effect.yellow_injury_rolls, 0.10, "amarilla", log=log)
         self._roll_injuries(state, effect.red_injury_rolls, 0.15, "roja", log=log)
         if effect.discard_top_cards:
             self.discard_top_cards(state, effect.discard_top_cards, log=log)
+
+    def _bot_yellow_card(self, state: MatchState, *, log: bool) -> None:
+        """El bot no tiene plantilla: cada amarilla tira un d8 y lo suma al
+        total de amarillas del partido; si supera 10, se convierte en roja y
+        se retiran dos amarillas acumuladas.
+        """
+
+        state.yellow_cards += 1
+        roll = state.randomizer.randint(1, 8)
+        total = roll + state.yellow_cards
+        if log:
+            self._log(
+                state,
+                "amarilla_bot",
+                f"Amarilla al bot: tirada d8={roll} + {state.yellow_cards} amarillas = {total}",
+            )
+        if total > 10:
+            state.yellow_cards = max(0, state.yellow_cards - 2)
+            state.red_cards += 1
+            self._apply_bot_red_card_penalty(state, log=log)
+
+    def _apply_bot_red_card_penalty(self, state: MatchState, *, log: bool) -> None:
+        """El bot pierde 2 MED y 4 AT de forma permanente por cada roja."""
+
+        opponent = state.opponent
+        state.opponent = replace(
+            opponent,
+            midfield=max(0, opponent.midfield - 2),
+            attack=max(0, opponent.attack - 4),
+        )
+        if log:
+            self._log(state, "expulsion", "El bot recibe una roja: -2 MED y -4 AT")
+
+    def _send_off_random_player(
+        self, state: MatchState, team: Team, label: str, *, log: bool
+    ) -> None:
+        """Expulsa a un jugador activo al azar; deja de sumar al equipo."""
+
+        active = [player for player in team.players if not player.sent_off]
+        if not active:
+            return
+        player = state.randomizer.choice(active)
+        player.sent_off = True
+        if log:
+            self._log(
+                state,
+                "expulsion",
+                f"Roja directa: expulsado un jugador de {label} "
+                f"({player.attribute.value} {player.value})",
+            )
+
+    def _card_random_player(
+        self, state: MatchState, team: Team, label: str, *, log: bool
+    ) -> bool:
+        """Amonesta a un jugador activo al azar.
+
+        Devuelve ``True`` si era su segunda amarilla y, por tanto, queda
+        expulsado (roja por acumulación).
+        """
+
+        active = [player for player in team.players if not player.sent_off]
+        if not active:
+            return False
+        player = state.randomizer.choice(active)
+        player.yellow_cards += 1
+        if log:
+            self._log(
+                state,
+                "amarilla_jugador",
+                f"Amarilla para un jugador de {label} "
+                f"({player.attribute.value} {player.value}); acumula {player.yellow_cards}",
+            )
+        if player.yellow_cards >= 2:
+            player.sent_off = True
+            if log:
+                self._log(
+                    state,
+                    "expulsion",
+                    f"Segunda amarilla: expulsado un jugador de {label} "
+                    f"({player.attribute.value} {player.value})",
+                )
+            return True
+        return False
 
     def _apply_dependent_effects(
         self, state: MatchState, effect: Effect, ai: "AutomaticPlayerAI", *, log: bool = True

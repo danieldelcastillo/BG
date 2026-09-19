@@ -6,11 +6,12 @@ goles medios por bando.
 from __future__ import annotations
 
 import argparse
+import os
 import random
 
 from .ai import AutomaticPlayerAI
 from .engine import RulesEngine
-from .game_state import MatchResult, Team
+from .game_state import MatchResult, Team, format_lineup, generate_players
 
 
 def _simulate(
@@ -64,8 +65,16 @@ def main() -> None:
         default=[12, 13, 14, 15, 16, 17, 18],
         help="Valores uniformes (DEF=MED=AT) del equipo del jugador a simular.",
     )
-    parser.add_argument("--seed", type=int, default=1, help="Semilla base reproducible.")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Semilla base reproducible. Si se omite, se usa una semilla aleatoria.",
+    )
     args = parser.parse_args()
+
+    if args.seed is None:
+        args.seed = int.from_bytes(os.urandom(8), "big")
 
     engine = RulesEngine()
     opponent = Team(*args.bot)
@@ -126,6 +135,10 @@ def main() -> None:
             f"{avg_cr_draws:.2f}",
         )
         print("".join(value.ljust(width) for value, width in zip(row, widths)))
+
+        sample_players = generate_players(level, level, level, random.Random(args.seed))
+        sample_team = Team(level, level, level, players=sample_players)
+        print(f"  Alineación de ejemplo: {format_lineup(sample_team)}")
 
     print("=" * 88)
 
