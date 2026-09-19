@@ -14,56 +14,57 @@ from .game_state import MatchState, RedCardResolution, Team, format_lineup
 from .strategies import OneNilLowCRAI
 
 
-# Diálogos de apertura de los dos comentaristas (independientes de la
-# semilla del partido, para no alterar la reproducibilidad del motor).
+# Diálogos de apertura de los dos comentaristas, con desmadre de cómic
+# de gags disparatados (independientes de la semilla del partido, para no
+# alterar la reproducibilidad del motor).
 _OPENING_DIALOGUES: tuple[tuple[str, str], ...] = (
     (
-        "¡Buenas noches y bienvenidos a este partidazo!",
-        "Se palpa la tensión en el ambiente, esto va a ser una batalla.",
+        "¡Buenas noches! Bienvenidos a un partido con más acción que una peli de espías.",
+        "Esperemos que no acabe todo en explosiones, como de costumbre.",
     ),
     (
-        "Los equipos ya están sobre el terreno de juego.",
-        "Y vaya par de plantillas se han preparado para hoy.",
+        "Los equipos ya están sobre el césped, listos para el lío.",
+        "Con esta plantilla, no me extrañaría ver algún que otro pastelazo.",
     ),
     (
-        "El árbitro ya tiene las tarjetas listas, se avecinan emociones.",
-        "Esperemos que sean más de alegría que de disgusto, compañero.",
+        "El árbitro ya tiene las tarjetas preparadas, como quien prepara collejas.",
+        "Esperemos que hoy nadie active el traje camuflaje por error.",
     ),
     (
-        "El césped luce impecable, listo para el espectáculo.",
-        "Ojalá los nervios no le jueguen una mala pasada a ningún equipo.",
+        "El césped luce impecable, ni rastro de rastrillos escondidos.",
+        "Eso espero, porque como alguien pise uno, esto se convierte en un episodio entero.",
     ),
     (
-        "Aquí estamos, con el pulso a mil, listos para el pitido inicial.",
-        "Yo ya tengo la garganta preparada para gritar el primer gol.",
+        "Aquí estamos, con más nervios que un inventor esperando la nómina.",
+        "Y yo con la garganta lista para gritar '¡GOOOL!' o '¡CATAPLOF!', lo que toque primero.",
     ),
     (
-        "La afición ha llenado las gradas, esto promete.",
-        "Con estas plantillas, no me extrañaría un partido de infarto.",
+        "La afición ha llenado las gradas, esto promete más caos que una oficina un lunes por la mañana.",
+        "Con estas plantillas, no descarto que el partido acabe con alguien esposado a la portería.",
     ),
 )
 
 # Comentario jocoso de cierre, según el resultado final.
 _CLOSING_JOKES_WIN: tuple[str, ...] = (
-    "El rival ya está pidiendo la revancha entre lágrimas.",
-    "El bot se va a casa a repasar el manual de instrucciones.",
-    "Esto ha sido una clase magistral, apunten los alumnos.",
-    "El marcador dice más de lo que las palabras pueden explicar.",
-    "El rival necesita unas vacaciones después de esto.",
+    "El rival se va a casa con más chichones que tras un torpe día de trabajo.",
+    "El entrenador estaría orgulloso... o gritando de la emoción, que en él es lo mismo.",
+    "Esto ha sido una lección magistral, con final de traca incluido.",
+    "El marcador dice más que mil informes técnicos.",
+    "El rival necesita un informe médico después de esta paliza.",
 )
 _CLOSING_JOKES_LOSS: tuple[str, ...] = (
-    "Toca revisar la cinta y aprender de los errores... y de las risas ajenas.",
-    "El técnico ya está preparando la charla motivacional de emergencia.",
-    "Al menos el buffet del descanso estuvo bueno.",
-    "Habrá que pedir explicaciones... y quizás un abrazo.",
-    "El rival se lleva los tres puntos y el equipo se lleva la lección.",
+    "Toca revisar la cinta y aprender, como quien tropieza dos veces con la misma piedra.",
+    "El técnico ya prepara la bronca de toda la vida.",
+    "Al menos el bocadillo del descanso sabía a gloria.",
+    "Esto ha sido un pastelazo en toda regla, y no de los buenos.",
+    "El rival se lleva los tres puntos y el equipo se lleva el chichón.",
 )
 _CLOSING_JOKES_DRAW: tuple[str, ...] = (
-    "Un empate que sabe a poco para ambos banquillos.",
-    "Nadie gana, nadie pierde, todos discuten en el bar de después.",
-    "Reparto de puntos y de quejas a partes iguales.",
-    "Ni ganadores ni perdedores, solo un partido para el recuerdo... a medias.",
-    "El marcador quedó en tablas, como el humor de ambos entrenadores.",
+    "Un empate que sabe a poco, como un invento a medio terminar.",
+    "Nadie gana, nadie pierde, pero todos salen con alguna magulladura.",
+    "Reparto de puntos y de collejas a partes iguales.",
+    "Ni ganadores ni perdedores, solo un lío de proporciones épicas.",
+    "El marcador quedó en tablas, como los inventos que ni explotan ni funcionan.",
 )
 
 
@@ -425,8 +426,8 @@ def write_match_trace(
     line()
     flavor_rng = Random(f"{seed}-flavor")
     comment_1, comment_2 = flavor_rng.choice(_OPENING_DIALOGUES)
-    line(f"> 🎙️ **Comentarista 1**: {comment_1}")
-    line(f"> 🎙️ **Comentarista 2**: {comment_2}")
+    line(f"> 🎙️ **Jim**: {comment_1}")
+    line(f"> 🎙️ **Bob**: {comment_2}")
     line()
     line(f"- 🎲 Semilla reproducible: `{seed}`")
     line(

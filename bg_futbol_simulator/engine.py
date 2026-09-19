@@ -41,101 +41,100 @@ if TYPE_CHECKING:
     from .ai import AutomaticPlayerAI
 
 
-# Frases al recibir un gol del bot (por presión o en contra por una CR).
+# Frases al recibir un gol del bot (por presión o en contra por una CR),
+# con desmadre de cómic de gags disparatados.
 _GOAL_AGAINST_JOKES: tuple[str, ...] = (
-    "El portero estaba pidiendo un autógrafo al balón.",
-    "La defensa se abrió como el Mar Rojo.",
-    "Ese gol lo vio hasta tu abuela desde el sofá.",
-    "El VAR ni se molestó en revisarlo, fue tan claro.",
-    "Tu defensa central perseguía una mariposa.",
-    "El portero se giró a saludar a la grada justo a tiempo... de ver el gol.",
-    "Ese balón entró más fácil que en un entrenamiento de porteros.",
-    "La defensa jugó al 'después de ti' con el delantero rival.",
-    "Alguien avise al gimnasio: la defensa necesita cardio.",
-    "El larguero se apiadó y dejó pasar el balón sin oponer resistencia.",
-    "Ese gol entró más limpio que la ropa recién planchada.",
-    "El portero estaba revisando el móvil.",
-    "La defensa se quedó posando para la foto del equipo.",
-    "Ese gol tuvo más aplausos del banquillo rival que del tuyo.",
-    "El portero pensó que era un tiro de esquina y no uno a puerta.",
-    "El portero se fue a comprar palomitas justo antes del gol.",
-    "La defensa hizo una guardia de honor al delantero rival.",
-    "Ese gol entró con más facilidad que en el modo fácil del videojuego.",
-    "El equipo entero se puso de acuerdo para no marcar al rival.",
-    "El portero le pidió perdón al palo por no llegar.",
-    "Esa jugada se ensayó mejor en el entrenamiento del rival que en el tuyo.",
-    "El portero se quedó plantado como una farola.",
-    "La defensa decidió tomarse un descanso justo en el peor momento.",
-    "Ese gol pasó más desapercibido para tu equipo que para el marcador.",
-    "El banquillo propio se tapó los ojos al verlo venir.",
+    "¡CATAPLOF! El portero activó por error el paraguas-cohete y salió volando hacia las nubes.",
+    "La defensa se enredó con un hilo de pescar reglamentario y cayeron todos en cadena.",
+    "¡PLOF! El central confundió el balón con una bomba de humo y se tiró al suelo tapándose la cabeza.",
+    "El portero se puso un disfraz de farola y el delantero rival lo atravesó sin darse cuenta.",
+    "¡BRRRUM! La defensa activó el propulsor equivocado y salió disparada fuera del campo.",
+    "El entrenador llamó furioso justo cuando entraba el balón: '¡ESTO ES UN DESASTRE, PEDAZO DE ANIMALES!'",
+    "El portero mordió un chicle explosivo y salió volando en el peor momento.",
+    "La defensa se puso unas gafas de rayos X al revés y vio el balón donde no estaba.",
+    "¡CATACRAC! El larguero se partió de risa y dejó pasar el balón sin oponer resistencia.",
+    "El portero confundió el silbato del árbitro con una alarma de incendios y salió corriendo al revés.",
+    "¡ZAS! Un tirón de orejas del entrenador distrajo a toda la defensa en el momento clave.",
+    "El defensor pisó un rastrillo de tebeo y salió disparado hacia atrás.",
+    "El portero activó un traje camuflaje de pared y el balón lo atravesó limpiamente.",
+    "¡BUM! La defensa se lió con un maletín de gadgets y terminaron todos esposados entre sí.",
+    "El VAR reveló que el defensor estaba disfrazado de árbol en mitad del área.",
+    "El portero se quedó pegado al palo con un pegamento de fraguado instantáneo.",
+    "¡CRASH! El delantero rival atravesó la defensa como si fuera de cartón piedra... porque lo era.",
+    "El técnico gritó '¡INEPTOS!' desde el banquillo justo cuando entraba el balón.",
+    "La defensa entera resbaló con la piel de plátano de rigor.",
+    "El portero activó el paracaídas en vez de estirarse al balón.",
+    "El entrenador mandó un informe urgente sobre la incompetencia defensiva, en mayúsculas.",
+    "El portero se puso a buscar el balón con lupa mientras ya estaba dentro de la red.",
 )
 
-# Frases al marcar tú un gol.
+# Frases al marcar tú un gol, con el mismo desmadre.
 _GOAL_FOR_JOKES: tuple[str, ...] = (
-    "Ese gol merece hasta un baile en el centro del campo.",
-    "El portero rival se quedó pidiendo la hora.",
-    "Ese remate tuvo más precisión que un GPS.",
-    "El larguero ni se enteró de que pasó el balón.",
-    "La afición ya está pidiendo la repetición en la pantalla gigante.",
-    "Ese gol se merece un anuncio por megafonía.",
-    "El delantero se cree crack por un rato, y con razón.",
-    "El portero rival sigue buscando el balón.",
-    "Ese gol entró más fino que un bisturí.",
-    "La grada se volvió loca, hasta el árbitro sonrió.",
-    "El VAR ni se molestó en revisarlo, fue un golazo limpio.",
-    "El banquillo rival ya está pidiendo un cambio de portero.",
-    "Ese gol quedará en la memoria... al menos hasta el próximo.",
-    "El defensor rival sigue corriendo detrás del balón fantasma.",
-    "Ese remate llevaba nombre y apellido.",
-    "El portero rival se lanzó al lado equivocado del planeta.",
-    "Ese gol se paga con entradas de cine para todo el equipo.",
-    "El delantero rival mira con envidia esa definición.",
-    "Ese balón entró como si tuviera GPS propio.",
-    "La grada rival se quedó en silencio sepulcral.",
+    "¡CATAPUM! Ese remate atravesó la portería como un misil teledirigido.",
+    "El entrenador llamó personalmente para felicitar semejante golazo: '¡ASÍ SE HACE, PEDAZO DE FENÓMENO!'",
+    "El portero rival se quedó tieso como una estatua de cera.",
+    "¡ZAS, EN TODA LA BOCA! Ese gol no admite réplica.",
+    "El delantero celebró con una voltereta digna de un agente esquivando una bomba.",
+    "Ese remate llevaba más pólvora que un cartucho de feria.",
+    "El portero rival buscó el balón durante diez minutos sin encontrarlo, como en los mejores gags.",
+    "¡PLAS! Gol tan limpio que hasta el árbitro aplaudió a escondidas.",
+    "La grada rival se quedó con la boca abierta como en una viñeta muda.",
+    "Ese gol merece hasta una medalla al mérito futbolístico.",
+    "El larguero tembló como quien recibe un interrogatorio en toda regla.",
+    "¡CATACROC! El defensor rival se quedó pegado al césped, literalmente.",
+    "Ese remate tenía más precisión que un invento que, por una vez, funciona a la primera.",
+    "El portero rival se escondió detrás del poste, en vano.",
+    "¡BOOM! Gol de traca final, como los fuegos artificiales de fin de año.",
+    "El banquillo rival empezó a discutir entre ellos como en una viñeta de bofetadas.",
+    "Ese gol tuvo más impacto que un mazazo en pleno despacho.",
+    "El delantero salió corriendo a celebrar como si huyera de una explosión de laboratorio.",
+    "¡CATAPLOF! El portero rival se resbaló intentando pararlo y acabó de espaldas.",
+    "Ese balón entró con la puntería de un gadget que, por una vez, funciona.",
 )
 
 # Frases al recibir una tarjeta roja propia (directa o por doble amarilla).
 _RED_CARD_OWN_JOKES: tuple[str, ...] = (
-    "El árbitro sacó la roja más rápido que un mesero trayendo la cuenta.",
-    "Directo a la ducha, sin pasar por el banquillo.",
-    "Esa entrada se vio hasta en la repetición en cámara súper lenta... tres veces.",
-    "El árbitro ni dudó: roja directa y silbato al máximo volumen.",
-    "Alguien confundió el partido con un rodeo.",
-    "El césped tembló con esa patada.",
-    "Esa fue una tarjeta roja tan roja que se veía desde el espacio.",
-    "El jugador se fue pensando en qué le va a decir al técnico.",
-    "El árbitro sacó la tarjeta con más ganas que un niño abriendo regalos.",
-    "Esa expulsión ya es tema de conversación en el vestuario.",
-    "El jugador se despidió del partido antes de tiempo, como quien se va sin pagar la cuenta.",
-    "Esa entrada mereció hasta aplausos... del árbitro sacando la tarjeta.",
-    "El jugador se fue camino al vestuario contando ovejas.",
-    "Esa tarjeta roja se vio venir desde el calentamiento.",
-    "El técnico ya está buscando explicaciones para la rueda de prensa.",
-    "Esa expulsión dejó al equipo jugando con uno menos y con la moral por el suelo.",
-    "El jugador se fue del campo escuchando abucheos propios.",
-    "Esa tarjeta se vio venir desde la grada más lejana.",
-    "El árbitro guardó la tarjeta amarilla, ya no hacía falta.",
-    "Esa expulsión va directa al resumen de lo peor del partido.",
+    "¡CATAPLOF! El árbitro sacó la tarjeta más roja que la cara del entrenador cuando algo sale mal.",
+    "El jugador se fue al vestuario con la cara larga, como un inventor tras un invento fallido.",
+    "¡ZAS! Esa entrada tuvo la sutileza de un mazazo de feria.",
+    "El técnico ya está gritando '¡SOIS UNOS INÚTILES!' desde el banquillo.",
+    "El jugador se fue expulsado dejando tras de sí una nube de humo, como en los mejores gags.",
+    "Esa tarjeta roja llegó más rápido que un guantazo de dibujos animados.",
+    "El jugador salió del campo con el paso torpe de quien acaba de pisar un rastrillo.",
+    "¡CATACRAC! El árbitro sacó la tarjeta con la fuerza de un golpe de kárate mal ejecutado.",
+    "El expulsado se fue murmurando disculpas como quien acaba de romper algo carísimo.",
+    "Esa expulsión hará que alguien llame furioso a mitad de la noche.",
+    "El jugador se fue directo a la ducha, sin pasar por casilla de banquillo, como en el juego de la oca.",
+    "¡PLOF! Esa tarjeta cayó con la gracia de un pastelazo en la cara.",
+    "El equipo se quedó con uno menos y con la moral por los suelos, como tras un plan que salió mal.",
+    "El jugador expulsado ya está pensando en la excusa perfecta para el informe del técnico.",
+    "Esa roja se veía venir desde el calentamiento, como una bomba con la mecha ya encendida.",
+    "El árbitro sacó la tarjeta con el mismo entusiasmo que un jefe firmando un despido.",
+    "El jugador se fue del campo dando tumbos, como si acabara de probar un invento explosivo.",
+    "Esa expulsión quedará en los anales del club como caso de manual.",
+    "El banquillo entero se llevó las manos a la cabeza al ver la tarjeta.",
+    "Esa roja tuvo la puntualidad de un reloj suizo, ni un segundo tarde.",
 )
 
 # Frases al ver al bot expulsado con tarjeta roja.
 _RED_CARD_RIVAL_JOKES: tuple[str, ...] = (
-    "El árbitro le mostró la roja al bot más rápido que un parpadeo.",
-    "El bot se va a la ducha sin decir ni pío.",
-    "Esa expulsión rival hay que celebrarla con confeti.",
-    "El bot se quedó sin argumentos para protestar.",
-    "El árbitro sacó la tarjeta con una sonrisa de oreja a oreja.",
-    "El bot se va del campo como quien pierde una apuesta.",
-    "Esa roja al rival cae más dulce que un helado en verano.",
-    "El banquillo rival se quedó sin palabras.",
-    "El bot recibió la tarjeta y hasta el público local aplaudió.",
-    "Esa expulsión rival vino con moño de regalo.",
-    "El árbitro no dudó ni un segundo en mandarlo a la caseta.",
-    "El bot se despide del partido sin derecho a réplica.",
-    "El técnico rival ya está pensando en un plan B, sin ese jugador.",
-    "Esa roja al bot se ve venir como Navidad en diciembre.",
-    "El bot se va pensando en qué le dirá a su entrenador virtual.",
+    "¡CATAPUM! El árbitro le enseñó la roja al bot más rápido que un guantazo de dibujos animados.",
+    "El bot se fue del campo con cara de inventor tras un invento explotado en las manos.",
+    "Esa expulsión rival hay que celebrarla con serpentinas y confeti.",
+    "El bot se marchó dejando tras de sí una nube de humo cómica.",
+    "¡ZAS! El árbitro sacó la tarjeta con más ganas que quien reparte collejas en el recreo.",
+    "El banquillo rival se quedó mudo, como tras un chasco de gadgets fallidos.",
+    "El bot se fue pensando en su próxima misión... si es que le queda alguna.",
+    "¡CATACROC! Esa roja al rival sonó como un mazazo directo a la mandíbula.",
+    "El técnico rival puso la misma cara que pone un jefe cuando todo sale mal.",
+    "El bot recibió la tarjeta con la elegancia de quien resbala con piel de plátano.",
+    "Esa expulsión rival cae más dulce que un caramelo requisado en la aduana.",
+    "El bot se despidió del partido entre aplausos y risas, como al final de un episodio.",
+    "El árbitro sacó la roja con la satisfacción de quien por fin atrapa al villano del capítulo.",
+    "El bot se fue del campo tropezando con su propio cable de alimentación.",
+    "Esa expulsión rival merece un titular a toda página en la prensa deportiva.",
 )
+
 
 
 def _pick_joke(state: MatchState, phrases: tuple[str, ...]) -> str:
@@ -640,12 +639,15 @@ class RulesEngine:
             state.red_cards += 1
             self._apply_bot_red_card_penalty(state, log=log)
         for _ in range(effect.player_yellow_cards):
+            outcome = self._card_random_player(state, state.player, "tu equipo", log=log)
+            if outcome is None:
+                continue
             state.player_yellow_cards += 1
-            if self._card_random_player(state, state.player, "tu equipo", log=log):
+            if outcome:
                 state.player_red_cards += 1
         for _ in range(effect.player_red_cards):
-            state.player_red_cards += 1
-            self._send_off_random_player(state, state.player, "tu equipo", log=log)
+            if self._send_off_random_player(state, state.player, "tu equipo", log=log):
+                state.player_red_cards += 1
         self._roll_injuries(state, effect.yellow_injury_rolls, 0.10, "amarilla", log=log)
         self._roll_injuries(state, effect.red_injury_rolls, 0.15, "roja", log=log)
         if effect.discard_top_cards:
@@ -686,12 +688,16 @@ class RulesEngine:
 
     def _send_off_random_player(
         self, state: MatchState, team: Team, label: str, *, log: bool
-    ) -> None:
-        """Expulsa a un jugador activo al azar; deja de sumar al equipo."""
+    ) -> bool:
+        """Expulsa a un jugador activo al azar; deja de sumar al equipo.
+
+        Devuelve ``False`` sin hacer nada si ya no queda ningún jugador activo
+        (para no contabilizar una roja que no se pudo aplicar a nadie).
+        """
 
         active = [player for player in team.players if not player.sent_off]
         if not active:
-            return
+            return False
         player = state.randomizer.choice(active)
         player.sent_off = True
         if log:
@@ -703,19 +709,22 @@ class RulesEngine:
             )
             if team is state.player:
                 self._log(state, "broma", _pick_joke(state, _RED_CARD_OWN_JOKES))
+        return True
 
     def _card_random_player(
         self, state: MatchState, team: Team, label: str, *, log: bool
-    ) -> bool:
+    ) -> bool | None:
         """Amonesta a un jugador activo al azar.
 
-        Devuelve ``True`` si era su segunda amarilla y, por tanto, queda
-        expulsado (roja por acumulación).
+        Devuelve ``None`` si no quedaba ningún jugador activo al que amonestar
+        (no se aplica ninguna tarjeta). En caso contrario devuelve ``True`` si
+        era su segunda amarilla y, por tanto, queda expulsado (roja por
+        acumulación), o ``False`` si solo fue una amarilla simple.
         """
 
         active = [player for player in team.players if not player.sent_off]
         if not active:
-            return False
+            return None
         player = state.randomizer.choice(active)
         player.yellow_cards += 1
         if log:
