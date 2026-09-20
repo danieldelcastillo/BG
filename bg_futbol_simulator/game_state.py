@@ -386,12 +386,11 @@ class MatchState:
             randomizer=self.randomizer,
         )
 
-    def decision_signature(self) -> tuple[tuple[str, ...], int, int, int]:
+    def decision_signature(self) -> tuple[tuple[str, ...], int, int, int, int, int]:
         """Estado relevante para una decisión local antes de una CF.
 
-        El orden e identidad de copias idénticas no cambia ninguna transición de
-        la CC actual, por lo que se normaliza. El mazo no entra: descartarlo no
-        altera la CF pendiente ni las comparaciones de CC.
+        El marcador también forma parte de la posición porque una CC puede tener
+        un modificador condicional que depende de si el bot está ganando o perdiendo.
         """
 
         return (
@@ -399,6 +398,8 @@ class MatchState:
             self.pending_cc_bonus,
             self.pending_cf_bonus,
             self.pressure,
+            self.player_goals,
+            self.bot_goals,
         )
 
 

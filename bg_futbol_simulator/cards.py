@@ -85,6 +85,21 @@ class ControlOption:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlConditional:
+    """Modificador adicional de una CC condicionado al marcador.
+
+    El modificador se aplica únicamente si la opción elegida genera el mismo
+    tipo de bono indicado por ``bonus_type``. Así, una carta que alterna entre
+    +CC y +CF puede llevar un único condicional marcado como CC o CF.
+    """
+
+    label: str
+    condition: RivalCondition
+    bonus_type: ControlBonusType
+    modifier: int
+
+
+@dataclass(frozen=True, slots=True)
 class ControlCard:
     """Carta de control (CC) que va a la mano del jugador."""
 
@@ -92,6 +107,7 @@ class ControlCard:
     name: str
     copies: int
     options: tuple[ControlOption, ...]
+    conditional: ControlConditional | None = None
 
     def option(self, key: str) -> ControlOption:
         for option in self.options:
@@ -163,10 +179,17 @@ class EventCard:
 
 
 class RivalCondition(str, Enum):
-    """Estado del marcador que activa la acción de la esquina inferior izquierda."""
+    """Estado del marcador que activa un efecto condicional."""
 
     RIVAL_WINNING = "el rival está ganando"
     RIVAL_LOSING = "el rival está perdiendo"
+
+
+class ControlBonusType(str, Enum):
+    """Tipo de bono de una CC al que puede afectar su modificador condicional."""
+
+    CC = "CC"
+    CF = "CF"
 
 
 @dataclass(frozen=True, slots=True)
@@ -247,6 +270,7 @@ def _control(
     reward_1: Effect,
     comparison_2: Comparison,
     reward_2: Effect,
+    conditional: ControlConditional | None = None,
 ) -> ControlCard:
     return ControlCard(
         definition_id=definition_id,
@@ -257,6 +281,30 @@ def _control(
             ControlOption("comparison_1", "Comparación 1", reward_1, comparison_1),
             ControlOption("comparison_2", "Comparación 2", reward_2, comparison_2),
         ),
+        conditional=conditional,
+    )
+
+
+def condicional_cc(
+    bonus_type: ControlBonusType,
+    condition: RivalCondition,
+    modifier: int,
+) -> ControlConditional:
+    """Crea el modificador condicional de una CC.
+
+    ``modifier`` puede ser positivo o negativo. Solo se suma al bono indicado
+    si la opción elegida de la CC realmente genera ese tipo de bono y se cumple
+    la condición del marcador en el momento de jugarla.
+    """
+
+    if modifier == 0:
+        raise ValueError("El modificador condicional debe ser distinto de cero.")
+    sign = "+" if modifier > 0 else ""
+    return ControlConditional(
+        label=f"{sign}{modifier} {bonus_type.value} si {condition.value}",
+        condition=condition,
+        bonus_type=bonus_type,
+        modifier=modifier,
     )
 
 
@@ -272,7 +320,12 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Comparison(Attribute.MED, Attribute.DEF),
             Effect(cc_bonus=10),
             Comparison(Attribute.DEF, Attribute.MED, 2),
-            Effect(cf_bonus=4)
+            Effect(cf_bonus=4),
+            condicional_cc(
+                ControlBonusType.CC,
+                RivalCondition.RIVAL_WINNING,
+                +3,
+            ),
         ),
         _control(
             "aggressive_recovery",
@@ -283,6 +336,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(pressure_delta=2, cf_bonus=4),
             Comparison(Attribute.DEF, Attribute.MED, 1),
             Effect(pressure_delta=2, cf_bonus=5),
+            condicional_cc(
+                ControlBonusType.CF,
+                RivalCondition.RIVAL_WINNING,
+                +3,
+            ),
         ),
         _control(
             "wing_play",
@@ -293,6 +351,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=4),
             Comparison(Attribute.MED, Attribute.MED, 0),
             Effect(cc_bonus=10),
+            condicional_cc(
+                ControlBonusType.CC,
+                RivalCondition.RIVAL_WINNING,
+                +4,
+            ),
         ),
         _control(
             "through_ball",
@@ -303,6 +366,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=9, pressure_delta=1),
             Comparison(Attribute.AT, Attribute.DEF, 0),
             Effect(cc_bonus=10),
+            condicional_cc(
+                ControlBonusType.CF,
+                RivalCondition.RIVAL_LOSING,
+                -3,
+            ),
         ),
         _control(
             "one_two",
@@ -313,6 +381,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cc_bonus=10),
             Comparison(Attribute.AT, Attribute.MED, 5),
             Effect(cf_bonus=8),
+            condicional_cc(
+                ControlBonusType.CC,
+                RivalCondition.RIVAL_WINNING,
+                +4,
+            ),
         ),
         _control(
             "cross_into_box",
@@ -323,6 +396,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=5),
             Comparison(Attribute.AT, Attribute.DEF, 8),
             Effect(cf_bonus=11),
+            condicional_cc(
+                ControlBonusType.CF,
+                RivalCondition.RIVAL_LOSING,
+                -3,
+            ),
         ),
         _control(
             "switch_of_play",
@@ -333,6 +411,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=5, pressure_delta=-1),
             Comparison(Attribute.MED, Attribute.DEF, 6),
             Effect(pressure_delta=1, cf_bonus=8),
+            condicional_cc(
+                ControlBonusType.CF,
+                RivalCondition.RIVAL_LOSING,
+                -4,
+            ),
         ),
         _control(
             "line_breaking_pass",
@@ -343,6 +426,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=8),
             Comparison(Attribute.AT, Attribute.DEF),
             Effect(cc_bonus=10),
+            condicional_cc(
+                ControlBonusType.CC,
+                RivalCondition.RIVAL_LOSING,
+                -4,
+            ),
         ),
         _control(
             "individual_action",
@@ -353,6 +441,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=5),
             Comparison(Attribute.AT, Attribute.DEF, 7),
             Effect(cf_bonus=7, yellow_cards=1),
+            condicional_cc(
+                ControlBonusType.CF,
+                RivalCondition.RIVAL_LOSING,
+                -3,
+            ),
         ),
         _control(
             "game_control",
@@ -363,6 +456,11 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(pressure_delta=-7, cc_bonus=8),
             Comparison(Attribute.MED, Attribute.MED, -1),
             Effect(pressure_delta=-4, cc_bonus=7),
+            condicional_cc(
+                ControlBonusType.CC,
+                RivalCondition.RIVAL_WINNING,
+                +3,
+            ),
         ),
     )
 

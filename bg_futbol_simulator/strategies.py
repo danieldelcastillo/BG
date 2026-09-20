@@ -114,7 +114,7 @@ class OneNilLowCRAI(AutomaticPlayerAI):
         frontier: list[tuple[MatchState, ControlPlan]] = [
             (state.clone_for_decision(), ControlPlan())
         ]
-        visited: set[tuple[tuple[str, ...], int, int, int]] = set()
+        visited: set[tuple[tuple[str, ...], int, int, int, int, int]] = set()
 
         while frontier:
             branch, plan = frontier.pop()

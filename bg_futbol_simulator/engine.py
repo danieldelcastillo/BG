@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from .cards import (
     CardInstance,
     Comparison,
+    ControlBonusType,
     ControlCard,
     Effect,
     EventCard,
@@ -248,6 +249,48 @@ class RulesEngine:
         )
 
     @staticmethod
+    def effective_control_effect_for_values(
+        player_goals: int,
+        bot_goals: int,
+        conditional,
+        effect: Effect,
+    ) -> tuple[Effect, bool]:
+        """Aplica el modificador condicional de una CC al bono que corresponda.
+
+        El condicional solo puede modificar el tipo indicado en la propia CC.
+        Si la opción elegida produce +CC, un condicional marcado como CF no hace
+        nada; y viceversa. La condición se comprueba con el marcador existente
+        justo antes de ejecutar la CC.
+        """
+
+        if conditional is None:
+            return effect, False
+
+        if conditional.condition is RivalCondition.RIVAL_WINNING:
+            condition_met = bot_goals > player_goals
+        else:
+            condition_met = bot_goals < player_goals
+
+        if not condition_met:
+            return effect, False
+
+        if conditional.bonus_type is ControlBonusType.CC and effect.cc_bonus:
+            return replace(effect, cc_bonus=effect.cc_bonus + conditional.modifier), True
+        if conditional.bonus_type is ControlBonusType.CF and effect.cf_bonus:
+            return replace(effect, cf_bonus=effect.cf_bonus + conditional.modifier), True
+        return effect, False
+
+    def effective_control_effect(self, state: MatchState, card: ControlCard, effect: Effect) -> tuple[Effect, bool]:
+        """Versión ligada al estado actual para ejecutar o auditar una CC."""
+
+        return self.effective_control_effect_for_values(
+            state.player_goals,
+            state.bot_goals,
+            card.conditional,
+            effect,
+        )
+
+    @staticmethod
     def comparison_succeeds_for_teams(
         player: Team,
         opponent: Team,
@@ -332,7 +375,16 @@ class RulesEngine:
 
         state.hand.pop(hand_index)
         state.discard_pile.append(instance)
-        self.apply_effect(state, option.effect, log=log)
+        effective_effect, conditional_applied = self.effective_control_effect(
+            state, card, option.effect
+        )
+        if conditional_applied and log:
+            self._log(
+                state,
+                "cc_condicional",
+                f"{card.name}: {card.conditional.label}",
+            )
+        self.apply_effect(state, effective_effect, log=log)
         if log:
             self._log(state, "juega_cc", f"Juega {card.name}: {option.label}")
 

@@ -484,6 +484,7 @@ def write_match_trace(
     line("- 🟪 **CE** — carta de evento: la IA elige una de sus tres opciones.")
     line("- 🔴 **CR** — carta roja: sustituye al contador de CR; se roba y se resuelve al instante.")
     line("- 🟢 **+n** — bono +CF que las CC aplican al atributo del jugador en una CF.")
+    line("- 🟡 **Modificador condicional CC** — añade un +/−n al bono CC o CF indicado en la propia carta solo si el marcador cumple la condición; si la opción elegida genera el otro tipo de bono, no se aplica.")
     line()
     line("## Desarrollo completo")
 
@@ -542,10 +543,22 @@ def write_match_trace(
                     if option.comparison is not None
                     else ""
                 )
-                line(f"- 🟩 CC {position}: **{control.name} — {option.label}**: {_effect_text(option.effect)}.{comparison}")
+                effective_effect, conditional_applied = engine.effective_control_effect(
+                    state, control, option.effect
+                )
+                conditional_text = ""
+                if control.conditional is not None:
+                    conditional_text = (
+                        f" Condicional CC: **{control.conditional.label}** → "
+                        + ("**activado**." if conditional_applied else "no activado para esta opción.")
+                    )
+                line(
+                    f"- 🟩 CC {position}: **{control.name} — {option.label}**: "
+                    f"{_effect_text(effective_effect)}.{comparison}{conditional_text}"
+                )
                 engine.apply_control_play(state, play)
-                if option.effect.cf_bonus:
-                    finalization_bonus_parts.append(option.effect.cf_bonus)
+                if effective_effect.cf_bonus:
+                    finalization_bonus_parts.append(effective_effect.cf_bonus)
             preview = engine.evaluate_finalization(state, card)
             _write_finalization_options(
                 output, state, card, preview.outcome, finalization_bonus_parts

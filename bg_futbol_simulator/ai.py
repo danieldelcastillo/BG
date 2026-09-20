@@ -82,7 +82,12 @@ class AutomaticPlayerAI:
         for instance in candidates:
             card = instance.card
             assert isinstance(card, ControlCard)
-            value = max(self._effect_value(state, option.effect) for option in card.options)
+            value = max(
+                self._effect_value(
+                    state, self.engine.effective_control_effect(state, card, option.effect)[0]
+                )
+                for option in card.options
+            )
             usable = sum(
                 option.comparison is not None
                 and self.engine.comparison_succeeds(state, option.comparison, state.pending_cc_bonus)
@@ -106,7 +111,7 @@ class AutomaticPlayerAI:
         future_cc_bonus = max(
             [state.pending_cc_bonus]
             + [
-                option.effect.cc_bonus
+                self.engine.effective_control_effect(state, card, option.effect)[0].cc_bonus
                 for card in cards.values()
                 for option in card.options
             ]
@@ -115,24 +120,30 @@ class AutomaticPlayerAI:
         for definition_id, card in cards.items():
             usable = 0
             potential = 0
-            effect_values = [self._effect_value(state, card.options[0].effect)]
+            effective_first = self.engine.effective_control_effect(
+                state, card, card.options[0].effect
+            )[0]
+            effect_values = [self._effect_value(state, effective_first)]
             for option in card.options[1:]:
+                effective_effect = self.engine.effective_control_effect(
+                    state, card, option.effect
+                )[0]
                 if option.comparison is None:
                     usable += 1
                     potential += 1
-                    effect_values.append(self._effect_value(state, option.effect))
+                    effect_values.append(self._effect_value(state, effective_effect))
                     continue
                 if self.engine.comparison_succeeds(
                     state, option.comparison, state.pending_cc_bonus
                 ):
                     usable += 1
                     potential += 1
-                    effect_values.append(self._effect_value(state, option.effect))
+                    effect_values.append(self._effect_value(state, effective_effect))
                 elif self.engine.comparison_succeeds(
                     state, option.comparison, future_cc_bonus
                 ):
                     potential += 1
-                    effect_values.append(self._effect_value(state, option.effect))
+                    effect_values.append(self._effect_value(state, effective_effect))
             assessments.append(
                 HandCardAssessment(
                     definition_id=definition_id,

@@ -26,6 +26,8 @@ class _DecisionPosition:
     pending_cc_bonus: int
     pending_cf_bonus: int
     pressure: int
+    player_goals: int
+    bot_goals: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +56,7 @@ class DecisionTree:
     """Explora todas las jugadas legales mediante búsqueda por capas exacta.
 
     La búsqueda usa una representación mínima y pura de las variables que
-    pueden afectar la CF pendiente: mano, +CC, +CF y presión. El motor comparte
+    pueden afectar la CF pendiente: mano, +CC, +CF, presión y marcador. El motor comparte
     sus funciones puras de comparación y CF, por lo que esta optimización no
     duplica ni altera reglas. El mazo, el descarte y el historial no afectan a
     ninguna comparación antes de esa CF y se aplican normalmente al ejecutar la
@@ -88,6 +90,8 @@ class DecisionTree:
             pending_cc_bonus=state.pending_cc_bonus,
             pending_cf_bonus=state.pending_cf_bonus,
             pressure=state.pressure,
+            player_goals=state.player_goals,
+            bot_goals=state.bot_goals,
         )
         key = self._cache_key(state, finalization, initial)
         cached = self._policy_cache.get(key)
@@ -207,16 +211,28 @@ class DecisionTree:
 
         hand = list(position.hand)
         hand.remove(play.card_definition_id)
-        effect = option.effect
+        effect, _conditional_applied = self.engine.effective_control_effect_for_values(
+            position.player_goals,
+            position.bot_goals,
+            card.conditional,
+            option.effect,
+        )
+        projected_pressure, bot_goal_from_pressure = self.engine.pressure_after_delta(
+            state.rules, position.pressure, effect.pressure_delta
+        )
         return _DecisionPosition(
             hand=tuple(hand),
             # +CC vigente se consume al jugar esta carta. Solo el +CC que
             # produzca la opción elegida puede llegar a la siguiente CC.
             pending_cc_bonus=effect.cc_bonus,
             pending_cf_bonus=position.pending_cf_bonus + effect.cf_bonus,
-            pressure=self.engine.pressure_after_delta(
-                state.rules, position.pressure, effect.pressure_delta
-            )[0],
+            pressure=projected_pressure,
+            player_goals=position.player_goals + effect.goals,
+            bot_goals=(
+                position.bot_goals
+                + effect.bot_goals
+                + (1 if bot_goal_from_pressure else 0)
+            ),
         )
 
     def _legal_next_plays(self, position: _DecisionPosition) -> tuple[ControlPlay, ...]:
