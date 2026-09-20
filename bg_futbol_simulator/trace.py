@@ -146,10 +146,26 @@ def _finalization_comparison_text(
     )
 
 
-def _red_comparison_text(state: MatchState, comparison: RedComparison) -> str:
-    """Desglosa la comparación rival-vs-jugador de una acción de CR."""
+def _red_comparison_text(
+    state: MatchState,
+    comparison: RedComparison,
+    *,
+    temporary_opponent_attribute=None,
+    temporary_opponent_modifier: int = 0,
+) -> str:
+    """Desglosa la comparación rival-vs-jugador, incluyendo el modificador temporal."""
 
-    rival_value = state.opponent.value(comparison.rival_attribute)
+    rival_base = state.opponent.value(comparison.rival_attribute)
+    rival_value = rival_base
+    temporary_text = ""
+    if (
+        temporary_opponent_attribute is not None
+        and comparison.rival_attribute is temporary_opponent_attribute
+    ):
+        rival_value += temporary_opponent_modifier
+        sign = "+" if temporary_opponent_modifier > 0 else ""
+        temporary_text = f"{rival_base} {sign}{temporary_opponent_modifier} = {rival_value}"
+
     player_base = state.player.value(comparison.player_attribute)
     player_value = player_base + comparison.player_modifier
     player_text = (
@@ -158,8 +174,9 @@ def _red_comparison_text(state: MatchState, comparison: RedComparison) -> str:
         else f"{player_base} {comparison.player_modifier:+d} = {player_value}"
     )
     operator = "<" if comparison.rival_must_be_lower else ">"
+    rival_text = temporary_text if temporary_text else str(rival_value)
     return (
-        f"{comparison.rival_attribute.value} rival {rival_value} {operator} "
+        f"{comparison.rival_attribute.value} rival {rival_text} {operator} "
         f"{comparison.player_attribute.value} jugador {player_text}"
     )
 
@@ -309,6 +326,16 @@ def _write_red_card_block(
     conditional_description = (
         f"{card.conditional.label} → {_effect_text(card.conditional.effect)}."
     )
+    temporary_attribute = (
+        card.conditional.temporary_opponent_attribute
+        if resolution.conditional_met
+        else None
+    )
+    temporary_modifier = (
+        card.conditional.temporary_opponent_modifier
+        if resolution.conditional_met
+        else 0
+    )
     if resolution.conditional_met:
         print(
             f"  - **✅ Esquina inferior izquierda (independiente, antes de la acción principal): {conditional_description}**",
@@ -321,7 +348,12 @@ def _write_red_card_block(
         )
     for index, action in enumerate(card.actions):
         description = (
-            f"{_red_comparison_text(state, action.comparison)} → {_effect_text(action.effect)}."
+            f"{_red_comparison_text(
+                state,
+                action.comparison,
+                temporary_opponent_attribute=temporary_attribute,
+                temporary_opponent_modifier=temporary_modifier,
+            )} → {_effect_text(action.effect)}."
         )
         if index == resolution.applied_action_index:
             print(f"  - **✅ Opción {index + 1}: {description}**", file=output)
@@ -530,12 +562,29 @@ def write_match_trace(
                 control = held.card
                 assert isinstance(control, ControlCard)
                 option = control.option(play.option_key)
+                (
+                    temporary_player_attribute,
+                    temporary_player_modifier,
+                    temporary_opponent_attribute,
+                    temporary_opponent_modifier,
+                    _conditional_condition_met,
+                ) = engine.temporary_control_modifiers_for_values(
+                    state.player_goals,
+                    state.bot_goals,
+                    control.conditional,
+                )
                 if option.comparison is not None and not engine.comparison_succeeds(
-                    state, option.comparison, state.pending_cc_bonus
+                    state,
+                    option.comparison,
+                    state.pending_cc_bonus,
+                    temporary_player_attribute=temporary_player_attribute,
+                    temporary_player_modifier=temporary_player_modifier,
+                    temporary_opponent_attribute=temporary_opponent_attribute,
+                    temporary_opponent_modifier=temporary_opponent_modifier,
                 ):
                     line(
-                        f"- 🟩 CC {position}: **{control.name} — {option.label}** ya no es válida "
-                        "(una expulsión cambió el equipo a mitad de plan); se detiene el resto de CC."
+                        f"- 🟩 CC {position}: **{control.name} — {option.label}** "
+                        "no supera la comparación con el estado actual; se detiene el resto de CC."
                     )
                     break
                 comparison = (

@@ -86,17 +86,24 @@ class ControlOption:
 
 @dataclass(frozen=True, slots=True)
 class ControlConditional:
-    """Modificador adicional de una CC condicionado al marcador.
+    """Condicional de una CC ligado al marcador.
 
-    El modificador se aplica únicamente si la opción elegida genera el mismo
-    tipo de bono indicado por ``bonus_type``. Así, una carta que alterna entre
-    +CC y +CF puede llevar un único condicional marcado como CC o CF.
+    El ``modifier`` modifica el bono ``CC`` o ``CF`` de la opción elegida,
+    manteniendo la regla previa de que solo afecta al tipo indicado por
+    ``bonus_type``. Además, el condicional puede aplicar un modificador
+    temporal a un atributo del jugador o del rival. Ese modificador solo
+    afecta a las comparaciones de esta CC y nunca altera permanentemente los
+    atributos de ningún equipo.
     """
 
     label: str
     condition: RivalCondition
-    bonus_type: ControlBonusType
-    modifier: int
+    bonus_type: ControlBonusType | None = None
+    modifier: int = 0
+    temporary_player_attribute: Attribute | None = None
+    temporary_player_modifier: int = 0
+    temporary_opponent_attribute: Attribute | None = None
+    temporary_opponent_modifier: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,11 +140,20 @@ class FinalizationOutcome:
 
 @dataclass(frozen=True, slots=True)
 class FinalizationConditional:
-    """Condicional independiente de una CF."""
+    """Condicional independiente de una CF.
+
+    Además de su ``effect`` opcional, puede aplicar un modificador temporal a
+    un atributo del jugador o del rival. Ese modificador solo afecta a las
+    comparaciones de la CF actual y después desaparece.
+    """
 
     label: str
     condition: RivalCondition
-    effect: Effect
+    effect: Effect = Effect()
+    temporary_player_attribute: Attribute | None = None
+    temporary_player_modifier: int = 0
+    temporary_opponent_attribute: Attribute | None = None
+    temporary_opponent_modifier: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,15 +234,18 @@ class RedCardAction:
 
 @dataclass(frozen=True, slots=True)
 class RedCardConditional:
-    """Acción de la esquina inferior izquierda de una CR.
+    """Acción independiente de una CR condicionada al marcador.
 
-    Se aplica siempre que se cumpla su condición de marcador, de forma
-    independiente a la acción principal (pudiendo sumarse ambos efectos).
+    Además de su efecto normal, puede aplicar un modificador temporal a un
+    atributo del bot. Ese modificador solo afecta a las comparaciones de la
+    CR actual y nunca altera permanentemente los atributos del equipo.
     """
 
     label: str
     condition: RivalCondition
-    effect: Effect
+    effect: Effect = Effect()
+    temporary_opponent_attribute: Attribute | None = None
+    temporary_opponent_modifier: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -286,25 +305,113 @@ def _control(
 
 
 def condicional_cc(
-    bonus_type: ControlBonusType,
-    condition: RivalCondition,
-    modifier: int,
+    first: RivalCondition | ControlBonusType,
+    second: ControlBonusType | RivalCondition | None = None,
+    modifier: int = 0,
+    *,
+    temporary_player_attribute: Attribute | None = None,
+    temporary_player_modifier: int = 0,
+    temporary_opponent_attribute: Attribute | None = None,
+    temporary_opponent_modifier: int = 0,
 ) -> ControlConditional:
-    """Crea el modificador condicional de una CC.
+    """Crea el condicional de una CC.
 
-    ``modifier`` puede ser positivo o negativo. Solo se suma al bono indicado
-    si la opción elegida de la CC realmente genera ese tipo de bono y se cumple
-    la condición del marcador en el momento de jugarla.
+    Admite las dos formas siguientes:
+
+    Forma anterior, para modificar +CC/+CF y opcionalmente un atributo temporal::
+
+        condicional_cc(ControlBonusType.CC, RivalCondition.RIVAL_WINNING, +5)
+
+    Forma simplificada, solo para modificar temporalmente un atributo::
+
+        condicional_cc(
+            RivalCondition.RIVAL_WINNING,
+            temporary_player_attribute=Attribute.MED,
+            temporary_player_modifier=6,
+        )
+
+    Los modificadores temporales afectan únicamente a las comparaciones de esta
+    CC y nunca alteran permanentemente los atributos del equipo.
     """
 
-    if modifier == 0:
-        raise ValueError("El modificador condicional debe ser distinto de cero.")
-    sign = "+" if modifier > 0 else ""
+    # Compatibilidad con la firma anterior:
+    # condicional_cc(bonus_type, condition, modifier)
+    # y nueva forma simplificada:
+    # condicional_cc(condition, temporary_player_attribute=..., ...)
+    if isinstance(first, ControlBonusType):
+        bonus_type = first
+        if not isinstance(second, RivalCondition):
+            raise TypeError(
+                "Cuando el primer argumento es ControlBonusType, el segundo debe ser RivalCondition."
+            )
+        condition = second
+    else:
+        condition = first
+        if second is None:
+            bonus_type = None
+        elif isinstance(second, ControlBonusType):
+            bonus_type = second
+        else:
+            raise TypeError(
+                "El segundo argumento debe ser ControlBonusType o None cuando el primero es RivalCondition."
+            )
+
+    if bonus_type is not None and modifier == 0:
+        raise ValueError("El modificador condicional debe ser distinto de cero cuando se modifica +CC/+CF.")
+    if bonus_type is None and modifier != 0:
+        raise ValueError("No se puede indicar modifier sin indicar ControlBonusType.")
+
+    if temporary_player_attribute is None and temporary_player_modifier != 0:
+        raise ValueError(
+            "No se puede indicar un modificador temporal del jugador sin atributo."
+        )
+    if temporary_player_attribute is not None and temporary_player_modifier == 0:
+        raise ValueError(
+            "El modificador temporal del jugador debe ser distinto de cero."
+        )
+    if temporary_opponent_attribute is None and temporary_opponent_modifier != 0:
+        raise ValueError(
+            "No se puede indicar un modificador temporal del rival sin atributo."
+        )
+    if temporary_opponent_attribute is not None and temporary_opponent_modifier == 0:
+        raise ValueError(
+            "El modificador temporal del rival debe ser distinto de cero."
+        )
+    if temporary_player_attribute is not None and temporary_opponent_attribute is not None:
+        raise ValueError(
+            "Una CC no puede modificar temporalmente al jugador y al rival a la vez."
+        )
+
+    modifier_text = ""
+    if bonus_type is not None:
+        sign = "+" if modifier > 0 else ""
+        modifier_text = f"{sign}{modifier} {bonus_type.value} si {condition.value}"
+    else:
+        modifier_text = f"Si {condition.value}"
+
+    temporary_text = ""
+    if temporary_player_attribute is not None:
+        sign = "+" if temporary_player_modifier > 0 else ""
+        temporary_text = (
+            f"; {sign}{temporary_player_modifier} "
+            f"{temporary_player_attribute.value} jugador solo para esta CC"
+        )
+    elif temporary_opponent_attribute is not None:
+        sign = "+" if temporary_opponent_modifier > 0 else ""
+        temporary_text = (
+            f"; {sign}{temporary_opponent_modifier} "
+            f"{temporary_opponent_attribute.value} rival solo para esta CC"
+        )
+
     return ControlConditional(
-        label=f"{sign}{modifier} {bonus_type.value} si {condition.value}",
+        label=modifier_text + temporary_text,
         condition=condition,
         bonus_type=bonus_type,
         modifier=modifier,
+        temporary_player_attribute=temporary_player_attribute,
+        temporary_player_modifier=temporary_player_modifier,
+        temporary_opponent_attribute=temporary_opponent_attribute,
+        temporary_opponent_modifier=temporary_opponent_modifier,
     )
 
 
@@ -317,44 +424,44 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Construcción desde atrás",
             4,
             Effect(cc_bonus=3),
-            Comparison(Attribute.MED, Attribute.DEF),
-            Effect(cc_bonus=10),
-            Comparison(Attribute.DEF, Attribute.MED, 2),
+            Comparison(Attribute.MED, Attribute.DEF, -1),
+            Effect(cc_bonus=9),
+            Comparison(Attribute.DEF, Attribute.MED, 3),
             Effect(cf_bonus=4),
             condicional_cc(
-                ControlBonusType.CC,
                 RivalCondition.RIVAL_WINNING,
-                +3,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=3,
             ),
         ),
         _control(
             "aggressive_recovery",
             "Recuperación agresiva",
-            4,
+            3,
             Effect(cc_bonus=4),
-            Comparison(Attribute.MED, Attribute.MED, 0),
+            Comparison(Attribute.MED, Attribute.MED, -1),
             Effect(pressure_delta=2, cf_bonus=4),
             Comparison(Attribute.DEF, Attribute.MED, 1),
             Effect(pressure_delta=2, cf_bonus=5),
             condicional_cc(
-                ControlBonusType.CF,
                 RivalCondition.RIVAL_WINNING,
-                +3,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=3,
             ),
         ),
         _control(
             "wing_play",
             "Apertura a banda",
             3,
-            Effect(cc_bonus=5),
-            Comparison(Attribute.MED, Attribute.DEF, 1),
-            Effect(cf_bonus=4),
-            Comparison(Attribute.MED, Attribute.MED, 0),
-            Effect(cc_bonus=10),
+            Effect(cc_bonus=4),
+            Comparison(Attribute.MED, Attribute.DEF, 4),
+            Effect(cf_bonus=5),
+            Comparison(Attribute.MED, Attribute.MED, -1),
+            Effect(cc_bonus=9),
             condicional_cc(
-                ControlBonusType.CC,
                 RivalCondition.RIVAL_WINNING,
-                +4,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=6,
             ),
         ),
         _control(
@@ -362,29 +469,29 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Balón al espacio",
             3,
             Effect(cf_bonus=3, pressure_delta=1),
-            Comparison(Attribute.MED, Attribute.DEF, 7),
+            Comparison(Attribute.MED, Attribute.DEF, 8),
             Effect(cf_bonus=9, pressure_delta=1),
             Comparison(Attribute.AT, Attribute.DEF, 0),
-            Effect(cc_bonus=10),
+            Effect(cc_bonus=9),
             condicional_cc(
-                ControlBonusType.CF,
                 RivalCondition.RIVAL_LOSING,
-                -3,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=-7,
             ),
         ),
         _control(
             "one_two",
             "Triangulación de equipo",
             3,
-            Effect(cc_bonus=3),
-            Comparison(Attribute.MED, Attribute.MED, 0),
-            Effect(cc_bonus=10),
-            Comparison(Attribute.AT, Attribute.MED, 5),
-            Effect(cf_bonus=8),
+            Effect(cc_bonus=4),
+            Comparison(Attribute.MED, Attribute.MED, -1),
+            Effect(cc_bonus=6),
+            Comparison(Attribute.AT, Attribute.MED, 7),
+            Effect(cf_bonus=9),
             condicional_cc(
-                ControlBonusType.CC,
                 RivalCondition.RIVAL_WINNING,
-                +4,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=6,
             ),
         ),
         _control(
@@ -392,14 +499,14 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Centro al área",
             3,
             Effect(cf_bonus=2),
-            Comparison(Attribute.MED, Attribute.DEF, 3),
-            Effect(cf_bonus=5),
+            Comparison(Attribute.MED, Attribute.DEF, 2),
+            Effect(cf_bonus=4),
             Comparison(Attribute.AT, Attribute.DEF, 8),
-            Effect(cf_bonus=11),
+            Effect(cf_bonus=9),
             condicional_cc(
-                ControlBonusType.CF,
                 RivalCondition.RIVAL_LOSING,
-                -3,
+                temporary_player_attribute=Attribute.AT,
+                temporary_player_modifier=-7,
             ),
         ),
         _control(
@@ -409,12 +516,12 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cc_bonus=5, discard_top_cards=1),
             Comparison(Attribute.MED, Attribute.MED, 6),
             Effect(cf_bonus=5, pressure_delta=-1),
-            Comparison(Attribute.MED, Attribute.DEF, 6),
+            Comparison(Attribute.MED, Attribute.DEF, 7),
             Effect(pressure_delta=1, cf_bonus=8),
             condicional_cc(
-                ControlBonusType.CF,
                 RivalCondition.RIVAL_LOSING,
-                -4,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=-5,
             ),
         ),
         _control(
@@ -423,13 +530,13 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             2,
             Effect(cc_bonus=4),
             Comparison(Attribute.MED, Attribute.DEF, 8),
-            Effect(cf_bonus=8),
-            Comparison(Attribute.AT, Attribute.DEF),
-            Effect(cc_bonus=10),
+            Effect(cf_bonus=9),
+            Comparison(Attribute.AT, Attribute.DEF, 0),
+            Effect(cc_bonus=9),
             condicional_cc(
-                ControlBonusType.CC,
                 RivalCondition.RIVAL_LOSING,
-                -4,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=-4,
             ),
         ),
         _control(
@@ -437,29 +544,29 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Acción individual",
             2,
             Effect(cf_bonus=3, pressure_delta=1),
-            Comparison(Attribute.AT, Attribute.DEF, 3),
+            Comparison(Attribute.AT, Attribute.DEF, 4),
             Effect(cf_bonus=5),
-            Comparison(Attribute.AT, Attribute.DEF, 7),
-            Effect(cf_bonus=7, yellow_cards=1),
+            Comparison(Attribute.AT, Attribute.DEF, 9),
+            Effect(cf_bonus=8, yellow_cards=1),
             condicional_cc(
-                ControlBonusType.CF,
                 RivalCondition.RIVAL_LOSING,
-                -3,
+                temporary_player_attribute=Attribute.AT,
+                temporary_player_modifier=-6,
             ),
         ),
         _control(
             "game_control",
             "Control del juego",
-            2,
-            Effect(cc_bonus=4, discard_top_cards=1),
+            3,
+            Effect(cc_bonus=5, discard_top_cards=1),
             Comparison(Attribute.MED, Attribute.MED, 2),
-            Effect(pressure_delta=-7, cc_bonus=8),
+            Effect(pressure_delta=-7, cc_bonus=7),
             Comparison(Attribute.MED, Attribute.MED, -1),
-            Effect(pressure_delta=-4, cc_bonus=7),
+            Effect(pressure_delta=-4, cc_bonus=6),
             condicional_cc(
-                ControlBonusType.CC,
                 RivalCondition.RIVAL_WINNING,
-                +3,
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=3,
             ),
         ),
     )
@@ -467,14 +574,63 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
 
 def condicional_cf(
     condition: RivalCondition,
-    effect: Effect,
+    effect: Effect = Effect(),
+    *,
+    temporary_player_attribute: Attribute | None = None,
+    temporary_player_modifier: int = 0,
+    temporary_opponent_attribute: Attribute | None = None,
+    temporary_opponent_modifier: int = 0,
 ) -> FinalizationConditional:
-    """Crea el condicional independiente de una CF, ejecutado antes del resultado principal."""
+    """Crea el condicional independiente de una CF.
+
+    Los modificadores temporales afectan únicamente a las comparaciones de la
+    CF actual. Se puede modificar un atributo del jugador o del rival, pero no
+    ambos a la vez, y nunca se altera permanentemente el equipo.
+    """
+
+    if temporary_player_attribute is None and temporary_player_modifier != 0:
+        raise ValueError(
+            "No se puede indicar un modificador temporal del jugador sin atributo."
+        )
+    if temporary_player_attribute is not None and temporary_player_modifier == 0:
+        raise ValueError(
+            "El modificador temporal del jugador debe ser distinto de cero."
+        )
+    if temporary_opponent_attribute is None and temporary_opponent_modifier != 0:
+        raise ValueError(
+            "No se puede indicar un modificador temporal del rival sin atributo."
+        )
+    if temporary_opponent_attribute is not None and temporary_opponent_modifier == 0:
+        raise ValueError(
+            "El modificador temporal del rival debe ser distinto de cero."
+        )
+    if temporary_player_attribute is not None and temporary_opponent_attribute is not None:
+        raise ValueError(
+            "Una CF no puede modificar temporalmente al jugador y al rival a la vez."
+        )
+
+    modifier_text = ""
+    if temporary_player_attribute is not None:
+        sign = "+" if temporary_player_modifier > 0 else ""
+        modifier_text = (
+            f"; {sign}{temporary_player_modifier} "
+            f"{temporary_player_attribute.value} jugador solo para esta CF"
+        )
+    elif temporary_opponent_attribute is not None:
+        sign = "+" if temporary_opponent_modifier > 0 else ""
+        modifier_text = (
+            f"; {sign}{temporary_opponent_modifier} "
+            f"{temporary_opponent_attribute.value} rival solo para esta CF"
+        )
 
     return FinalizationConditional(
-        label=f"Si {condition.value}",
+        label=f"Si {condition.value}{modifier_text}",
         condition=condition,
         effect=effect,
+        temporary_player_attribute=temporary_player_attribute,
+        temporary_player_modifier=temporary_player_modifier,
+        temporary_opponent_attribute=temporary_opponent_attribute,
+        temporary_opponent_modifier=temporary_opponent_modifier,
     )
 
 
@@ -512,18 +668,19 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "one_on_one", 
             "Mano a mano", 
-            high_goal(Attribute.AT, 9),
+            high_goal(Attribute.AT, 10),
             FinalizationOutcome(
                 "Descarta 1 CC de la mano y +1 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
                 Effect(discard_control_cards=1, pressure_delta=1),
-                strict_comparison(Attribute.AT, Attribute.DEF, -2),
+                strict_comparison(Attribute.AT, Attribute.DEF, -1),
             ),
             cr(),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,
-                Effect(pressure_delta=-5),
+                temporary_player_attribute=Attribute.AT,
+                temporary_player_modifier=4,
             ),
         ),
         _finalization(
@@ -533,20 +690,21 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 OutcomeKind.PRESSURE_REDUCTION, 
                 1, 
                 Effect(pressure_delta=2), 
-                strict_comparison(Attribute.MED, Attribute.DEF, -2)),
+                strict_comparison(Attribute.MED, Attribute.DEF, -1)),
             cr(),
             condicional_cf(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=3),
+                temporary_player_attribute=Attribute.MED,
+                temporary_player_modifier=-6,
             ),
         ),
         _finalization(
-            "header", "Remate de cabeza", high_goal(Attribute.AT, 8),
+            "header", "Remate de cabeza", high_goal(Attribute.AT, 10),
             FinalizationOutcome(
                 "-2 a la presión, luego roba 1 CR",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(pressure_delta=-2,cr_draws=1),
+                Effect(pressure_delta=-1,cr_draws=1),
                 strict_comparison(Attribute.AT, Attribute.DEF, -3),
             ),
             FinalizationOutcome(
@@ -557,17 +715,18 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
             ),
             condicional_cf(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=4),
+                temporary_player_attribute=Attribute.AT,
+                temporary_player_modifier=-6,
              ),
         ),
         _finalization(
-            "long_shot", "Disparo lejano", high_goal(Attribute.AT, 9),
+            "long_shot", "Disparo lejano", high_goal(Attribute.AT, 10),
             FinalizationOutcome(
-                "+1 Presión",
+                "+2 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(pressure_delta=1),
-                strict_comparison(Attribute.AT, Attribute.DEF, 1),
+                Effect(pressure_delta=2),
+                strict_comparison(Attribute.AT, Attribute.DEF, -2),
             ),
             FinalizationOutcome(
                 "Descarta una CC de la mano y roba 1 CR",
@@ -577,7 +736,8 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
             ),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,
-                Effect(pressure_delta=-5),
+                temporary_player_attribute=Attribute.AT,
+                temporary_player_modifier=4,
             ),
         ),
         _finalization(
@@ -586,21 +746,21 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 "-7 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 2,
-                Effect(pressure_delta=-7),
+                Effect(pressure_delta=-6),
                 strict_comparison(Attribute.MED, Attribute.DEF, 7),
             ),
             FinalizationOutcome(
-                "Descarta una CC de la mano, +3 Presión",
+                "Descarta una CC de la mano, +1 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(discard_control_cards=1, pressure_delta=3),
-                strict_comparison(Attribute.MED, Attribute.DEF, -3),
+                Effect(discard_control_cards=1, pressure_delta=1),
+                strict_comparison(Attribute.MED, Attribute.DEF, -1),
             ),
             FinalizationOutcome(
-                "+4 Presión y descarta una CC de la mano",
+                "+2 Presión y descarta una CC de la mano",
                 OutcomeKind.PRESSURE_INCREASE,
                 0,
-                Effect(pressure_delta=4, discard_control_cards=1),
+                Effect(pressure_delta=2, discard_control_cards=1),
             ),
             condicional_cf(
                 RivalCondition.RIVAL_LOSING,
@@ -611,28 +771,28 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "draw_foul", "Provocar la falta",
             FinalizationOutcome(
-                "Tarjeta roja y descarta una carta del mazo",
-                OutcomeKind.RED_CARD,
+                "Tarjeta amarilla par el rival, descarta una carta del mazo, y -5 a la presión",
+                OutcomeKind.YELLOW_CARD,
                 2,
-                Effect(red_cards=1, discard_top_cards=1),
-                strict_comparison(Attribute.AT, Attribute.DEF, 9),
+                Effect(yellow_cards=1, discard_top_cards=1, pressure_delta=-5),
+                strict_comparison(Attribute.AT, Attribute.DEF, 7),
             ),
             FinalizationOutcome(
-                "Tarjeta amarilla y +1 Presión",
+                "Tarjeta amarilla y +2 Presión",
                 OutcomeKind.YELLOW_CARD,
                 1,
-                Effect(yellow_cards=1, pressure_delta=1),
+                Effect(yellow_cards=1, pressure_delta=2),
                 strict_comparison(Attribute.AT, Attribute.DEF, 2),
             ),
             FinalizationOutcome(
-                "+3 de Presión y descarta la primera carta del mazo",
+                "+2 de Presión y descarta la primera carta del mazo",
                 OutcomeKind.CR_DRAW,
                 0,
-                Effect(pressure_delta=3, discard_top_cards=1),
+                Effect(pressure_delta=2, discard_top_cards=1),
             ),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,
-                 Effect(pressure_delta=-5, discard_top_cards=1),
+                 Effect(pressure_delta=-2, discard_top_cards=1),
              ),
         ),
     )
@@ -666,15 +826,15 @@ def event_card_definitions() -> tuple[EventCard, ...]:
             "time_wasting",
             "Pérdida de tiempo",
             3,
-            Effect(discard_top_cards=3, pressure_delta=2),
-            Effect(pressure_delta=-5, yellow_injury_rolls=1, discard_top_cards=2),
-            Effect(player_yellow_cards=1, discard_top_cards=1, pressure_delta=-3),
+            Effect(discard_top_cards=3, pressure_delta=4),
+            Effect(pressure_delta=-2, yellow_injury_rolls=1, discard_top_cards=2),
+            Effect(player_yellow_cards=1, discard_top_cards=1, pressure_delta=-4),
         ),
         _event(
             "offside",
             "Fuera de juego",
             4,
-            Effect(discard_top_cards=1, discard_control_cards=2, pressure_delta=6),
+            Effect(discard_top_cards=1, discard_control_cards=1, pressure_delta=5),
             Effect(cr_draws=1,discard_control_cards=1,pressure_delta=-1),
             Effect(cr_draws=1),
         ),
@@ -682,17 +842,17 @@ def event_card_definitions() -> tuple[EventCard, ...]:
             "advantage_rule",
             "Ley de la ventaja",
             2,
-            Effect(yellow_cards=1, pressure_delta=3),
-            Effect(discard_top_cards=1, yellow_injury_rolls=1, pressure_delta=-3),
-            Effect(player_yellow_cards=1, yellow_injury_rolls=1, pressure_delta=-4),
+            Effect(yellow_cards=1, pressure_delta=4),
+            Effect(discard_top_cards=1, yellow_injury_rolls=1, pressure_delta=-5),
+            Effect(player_yellow_cards=1, yellow_injury_rolls=1, pressure_delta=-5),
         ),
         _event(
             "var",
             "VAR",
             1,
-            Effect(yellow_cards=1, pressure_delta=1, discard_top_cards=1),
-            Effect(cr_draws=1, pressure_delta=-5, discard_top_cards=1),
-            Effect(recover_control_cards=3, pressure_delta=2),
+            Effect(yellow_cards=1, pressure_delta=5, discard_top_cards=1),
+            Effect(cr_draws=1, pressure_delta=-1, discard_top_cards=1),
+            Effect(recover_control_cards=3, pressure_delta=5),
         ),
     )
 
@@ -748,9 +908,43 @@ def _red_action(
     )
 
 
-def _red_conditional(condition: RivalCondition, effect: Effect) -> RedCardConditional:
+def _red_conditional(
+    condition: RivalCondition,
+    effect: Effect = Effect(),
+    *,
+    temporary_opponent_attribute: Attribute | None = None,
+    temporary_opponent_modifier: int = 0,
+) -> RedCardConditional:
+    """Crea el condicional de una CR.
+
+    ``effect`` es opcional para permitir condicionales que solo modifiquen una
+    comparación de la CR. Si se indica ``temporary_opponent_attribute``, el modificador asociado se
+    aplica únicamente a las comparaciones de la CR actual cuando se cumple la
+    condición del marcador.
+    """
+
+    if temporary_opponent_attribute is None and temporary_opponent_modifier != 0:
+        raise ValueError(
+            "No se puede indicar un modificador temporal del rival sin atributo."
+        )
+    if temporary_opponent_attribute is not None and temporary_opponent_modifier == 0:
+        raise ValueError(
+            "El modificador temporal del rival debe ser distinto de cero."
+        )
+
+    modifier_text = ""
+    if temporary_opponent_attribute is not None:
+        sign = "+" if temporary_opponent_modifier > 0 else ""
+        modifier_text = (
+            f"; {sign}{temporary_opponent_modifier} "
+            f"{temporary_opponent_attribute.value} rival solo para esta CR"
+        )
     return RedCardConditional(
-        label=f"Si {condition.value}", condition=condition, effect=effect
+        label=f"Si {condition.value}{modifier_text}",
+        condition=condition,
+        effect=effect,
+        temporary_opponent_attribute=temporary_opponent_attribute,
+        temporary_opponent_modifier=temporary_opponent_modifier,
     )
 
 
@@ -788,29 +982,31 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "ataque_banda",
             "Ataque por banda",
-            _red_action(Attribute.MED, Attribute.DEF, 3, Effect(pressure_delta=7)),
-            _red_action(Attribute.MED, Attribute.MED, 2, Effect(pressure_delta=6)),
-            Effect(pressure_delta=5),
+            _red_action(Attribute.MED, Attribute.DEF, 3, Effect(pressure_delta=5)),
+            _red_action(Attribute.MED, Attribute.MED, 1, Effect(pressure_delta=4)),
+            Effect(pressure_delta=2),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
-                Effect(discard_top_cards=1, pressure_delta=-4),
+                temporary_opponent_attribute=Attribute.MED,
+                temporary_opponent_modifier=-5,
             ),
         ),
         _red_card(
             "control_posesion",
             "Control de la posesión",
             _red_action(
-                Attribute.MED, Attribute.MED, 1,
-                Effect(discard_control_cards=1, pressure_delta=7),
+                Attribute.MED, Attribute.MED, 3,
+                Effect(discard_control_cards=1, pressure_delta=5),
             ),
             _red_action(
-                Attribute.MED, Attribute.MED, -3,
-                Effect(discard_control_cards=1, pressure_delta=6),
+                Attribute.MED, Attribute.MED, -1,
+                Effect(discard_control_cards=1, pressure_delta=4),
             ),
-            Effect(discard_control_cards=1, pressure_delta=4),
+            Effect(discard_control_cards=1, pressure_delta=3),
             _red_conditional(
                 RivalCondition.RIVAL_WINNING,
-                Effect(discard_top_cards=1, pressure_delta=-4),
+                temporary_opponent_attribute=Attribute.MED,
+                temporary_opponent_modifier=-3,
             ),
         ),
         _red_card(
@@ -820,46 +1016,48 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Attribute.AT, Attribute.DEF, 4,
                 Effect(bot_goals=1)),
             _red_action(
-                Attribute.AT, Attribute.DEF, 1,
-                Effect( pressure_delta=5),
+                Attribute.AT, Attribute.DEF, 0,
+                Effect(pressure_delta=4),
             ),
             Effect(discard_top_cards=1, player_yellow_cards=1, pressure_delta=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=5),
+                    temporary_opponent_attribute=Attribute.AT,
+                    temporary_opponent_modifier=5,
             ),
         ),
         _red_card(
             "balon_parado",
             "Balón parado",
-            _red_action(Attribute.AT, Attribute.DEF, 4, Effect(bot_goals=1)),
-            _red_action(Attribute.AT, Attribute.DEF, 2, Effect(pressure_delta=6)),
-            Effect(pressure_delta=4),
+            _red_action(Attribute.AT, Attribute.DEF, 6, Effect(bot_goals=1)),
+            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=3)),
+            Effect(pressure_delta=2, discard_top_cards=1),
             _red_conditional(
-                RivalCondition.RIVAL_WINNING,
-                Effect(discard_top_cards=1, pressure_delta=-3),
+                RivalCondition.RIVAL_LOSING,
+                temporary_opponent_attribute=Attribute.AT,
+                temporary_opponent_modifier=5,
             ),
         ),
         _red_card(
             "centro_area_rival",
             "Centro al área",
-            _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=7)),
-            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=6)),
-            Effect(pressure_delta=3),
+            _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=4)),
+            _red_action(Attribute.AT, Attribute.DEF, -1, Effect(pressure_delta=3)),
+            Effect(pressure_delta=2),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=5),
+                Effect(pressure_delta=4),
             ),
         ),
         _red_card(
             "robo_mediocampo",
             "Robo en medio campo",
-            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=6)),
-            _red_action(Attribute.MED, Attribute.MED, 2, Effect(pressure_delta=6)),
-            Effect(pressure_delta=3),
+            _red_action(Attribute.DEF, Attribute.MED, 1, Effect(pressure_delta=4)),
+            _red_action(Attribute.MED, Attribute.MED, -1, Effect(pressure_delta=3)),
+            Effect(pressure_delta=2),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
-                Effect(discard_control_cards=1, pressure_delta=4),
+                Effect(discard_control_cards=1, pressure_delta=3),
             ),
         ),
         _red_card(
@@ -867,16 +1065,17 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Contraataque rival",
             _red_action(
                 Attribute.AT, Attribute.MED, 4,
-                Effect(recover_control_cards=1, bot_goals=1),
+                Effect(bot_goals=1),
             ),
             _red_action(
-                Attribute.AT, Attribute.MED, 1,
-                Effect(pressure_delta=1, draw_red_cards=1),
+                Attribute.AT, Attribute.MED, -2,
+                Effect(pressure_delta=4),
             ),
-            Effect(pressure_delta=5, recover_control_cards=1),
+            Effect(pressure_delta=3, recover_control_cards=1),
             _red_conditional(
-                RivalCondition.RIVAL_WINNING,
-                Effect(player_yellow_cards=1, pressure_delta=-5),
+                RivalCondition.RIVAL_LOSING,
+                temporary_opponent_attribute=Attribute.AT,
+                temporary_opponent_modifier=5,
             ),
         ),
         _red_card(
@@ -887,13 +1086,13 @@ def red_card_definitions() -> tuple[RedCard, ...]:
                 Effect(recover_control_cards=1, pressure_delta=5),
             ),
             _red_action(
-                Attribute.MED, Attribute.MED, 3, 
-                Effect(pressure_delta=5)
+                Attribute.MED, Attribute.MED, 1, 
+                Effect(pressure_delta=4)
             ),
-                Effect(pressure_delta=3, discard_control_cards=1),
+                Effect(pressure_delta=2, discard_control_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=5),
+                Effect(pressure_delta=4 ),
             ),
         ),
     )

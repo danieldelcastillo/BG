@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from .cards import (
+    Attribute,
     CardInstance,
     Comparison,
     ControlBonusType,
@@ -237,8 +238,18 @@ class RulesEngine:
         state: MatchState,
         comparison: Comparison,
         temporary_bonus: int = 0,
+        *,
+        temporary_player_attribute: Attribute | None = None,
+        temporary_player_modifier: int = 0,
+        temporary_opponent_attribute: Attribute | None = None,
+        temporary_opponent_modifier: int = 0,
     ) -> bool:
-        """Resuelve una comparación aplicando el bono temporal al jugador."""
+        """Resuelve una comparación con los modificadores temporales activos.
+
+        ``temporary_bonus`` sigue representando el +CC/+CF pendiente. Los
+        modificadores de atributo son adicionales y solo duran para la
+        comparación de la carta que los ha activado.
+        """
 
         return self.comparison_succeeds_for_teams(
             state.player,
@@ -246,7 +257,21 @@ class RulesEngine:
             state.rules,
             comparison,
             temporary_bonus,
+            temporary_player_attribute=temporary_player_attribute,
+            temporary_player_modifier=temporary_player_modifier,
+            temporary_opponent_attribute=temporary_opponent_attribute,
+            temporary_opponent_modifier=temporary_opponent_modifier,
         )
+
+    @staticmethod
+    def _rival_condition_met_for_values(
+        player_goals: int,
+        bot_goals: int,
+        condition: RivalCondition,
+    ) -> bool:
+        if condition is RivalCondition.RIVAL_WINNING:
+            return bot_goals > player_goals
+        return bot_goals < player_goals
 
     @staticmethod
     def effective_control_effect_for_values(
@@ -257,20 +282,17 @@ class RulesEngine:
     ) -> tuple[Effect, bool]:
         """Aplica el modificador condicional de una CC al bono que corresponda.
 
-        El condicional solo puede modificar el tipo indicado en la propia CC.
-        Si la opción elegida produce +CC, un condicional marcado como CF no hace
-        nada; y viceversa. La condición se comprueba con el marcador existente
-        justo antes de ejecutar la CC.
+        El condicional solo modifica el tipo indicado en la propia CC para la
+        opción elegida. Los modificadores temporales de atributo se resuelven
+        por separado y afectan a las comparaciones de esta CC mientras dure.
         """
 
         if conditional is None:
             return effect, False
 
-        if conditional.condition is RivalCondition.RIVAL_WINNING:
-            condition_met = bot_goals > player_goals
-        else:
-            condition_met = bot_goals < player_goals
-
+        condition_met = RulesEngine._rival_condition_met_for_values(
+            player_goals, bot_goals, conditional.condition
+        )
         if not condition_met:
             return effect, False
 
@@ -279,6 +301,36 @@ class RulesEngine:
         if conditional.bonus_type is ControlBonusType.CF and effect.cf_bonus:
             return replace(effect, cf_bonus=effect.cf_bonus + conditional.modifier), True
         return effect, False
+
+    @staticmethod
+    def temporary_control_modifiers_for_values(
+        player_goals: int,
+        bot_goals: int,
+        conditional,
+    ) -> tuple[Attribute | None, int, Attribute | None, int, bool]:
+        """Obtiene los modificadores temporales de una CC según el marcador.
+
+        El resultado es ``(jugador_atributo, jugador_mod, rival_atributo,
+        rival_mod, condición_cumplida)``. Los modificadores solo se aplican
+        durante las comparaciones de la CC actual.
+        """
+
+        if conditional is None:
+            return None, 0, None, 0, False
+
+        condition_met = RulesEngine._rival_condition_met_for_values(
+            player_goals, bot_goals, conditional.condition
+        )
+        if not condition_met:
+            return None, 0, None, 0, False
+
+        return (
+            conditional.temporary_player_attribute,
+            conditional.temporary_player_modifier,
+            conditional.temporary_opponent_attribute,
+            conditional.temporary_opponent_modifier,
+            True,
+        )
 
     def effective_control_effect(self, state: MatchState, card: ControlCard, effect: Effect) -> tuple[Effect, bool]:
         """Versión ligada al estado actual para ejecutar o auditar una CC."""
@@ -297,11 +349,32 @@ class RulesEngine:
         rules: MatchRules,
         comparison: Comparison,
         temporary_bonus: int = 0,
+        *,
+        temporary_player_attribute: Attribute | None = None,
+        temporary_player_modifier: int = 0,
+        temporary_opponent_attribute: Attribute | None = None,
+        temporary_opponent_modifier: int = 0,
     ) -> bool:
-        """Versión pura de una comparación, reutilizable por el árbol de IA."""
+        """Versión pura de una comparación, reutilizable por el árbol de IA.
+
+        Los modificadores temporales se aplican solo si la comparación usa el
+        atributo indicado. No se modifica el objeto ``Team``.
+        """
 
         player_value = player.value(comparison.player_attribute) + temporary_bonus
+        if (
+            temporary_player_attribute is not None
+            and comparison.player_attribute is temporary_player_attribute
+        ):
+            player_value += temporary_player_modifier
+
         opponent_value = opponent.value(comparison.opponent_attribute) + comparison.opponent_modifier
+        if (
+            temporary_opponent_attribute is not None
+            and comparison.opponent_attribute is temporary_opponent_attribute
+        ):
+            opponent_value += temporary_opponent_modifier
+
         ties_succeed = (
             rules.ties_succeed
             if comparison.ties_succeed is None
@@ -365,8 +438,27 @@ class RulesEngine:
 
         current_cc_bonus = state.pending_cc_bonus
         state.pending_cc_bonus = 0
+
+        (
+            temporary_player_attribute,
+            temporary_player_modifier,
+            temporary_opponent_attribute,
+            temporary_opponent_modifier,
+            conditional_condition_met,
+        ) = self.temporary_control_modifiers_for_values(
+            state.player_goals,
+            state.bot_goals,
+            card.conditional,
+        )
+
         if option.comparison is not None and not self.comparison_succeeds(
-            state, option.comparison, current_cc_bonus
+            state,
+            option.comparison,
+            current_cc_bonus,
+            temporary_player_attribute=temporary_player_attribute,
+            temporary_player_modifier=temporary_player_modifier,
+            temporary_opponent_attribute=temporary_opponent_attribute,
+            temporary_opponent_modifier=temporary_opponent_modifier,
         ):
             state.pending_cc_bonus = current_cc_bonus
             raise IllegalPlay(
@@ -375,8 +467,13 @@ class RulesEngine:
 
         state.hand.pop(hand_index)
         state.discard_pile.append(instance)
-        effective_effect, conditional_applied = self.effective_control_effect(
+        effective_effect, bonus_conditional_applied = self.effective_control_effect(
             state, card, option.effect
+        )
+        conditional_applied = conditional_condition_met and (
+            bonus_conditional_applied
+            or temporary_player_attribute is not None
+            or temporary_opponent_attribute is not None
         )
         if conditional_applied and log:
             self._log(
@@ -391,24 +488,29 @@ class RulesEngine:
     def execute_control_plan(
         self, state: MatchState, plan: ControlPlan, *, log: bool = True
     ) -> None:
-        """Ejecuta la secuencia ordenada de CC elegida por la IA.
+        """Ejecuta la secuencia de CC elegida por la IA.
 
-        Si una expulsión de jugador entre CC deja de cumplirse una
-        comparación ya planificada (la plantilla cambia entre el cálculo del
-        plan y su ejecución), se detiene el resto del plan en vez de fallar.
+        Una CC que ya forma parte de un plan decidido no se invalida porque
+        cambie un atributo temporal o un estado intermedio del partido.
+        Las comparaciones se validan al decidir la carta y los modificadores
+        temporales pertenecen únicamente a su propia resolución.
+
+        Solo se detiene la secuencia si la carta realmente ya no existe en
+        la mano por un efecto anterior.
         """
 
         for play in plan.plays:
             try:
                 self.apply_control_play(state, play, log=log)
-            except IllegalPlay:
+            except IllegalPlay as error:
                 if log:
                     self._log(
                         state,
                         "plan_cc_obsoleto",
-                        "Una expulsión cambió el equipo a mitad de plan; se detiene el resto de CC",
+                        f"CC cancelada porque ya no puede ejecutarse: {error}",
                     )
                 break
+
 
     def discard_control_from_hand(
         self, state: MatchState, definition_id: str, *, log: bool = True
@@ -427,6 +529,11 @@ class RulesEngine:
     ) -> FinalizationPreview:
         """Selecciona el primer resultado de CF cuya comparación se supera."""
 
+        conditional = card.conditional
+        conditional_met = (
+            conditional is not None
+            and self._rival_condition_met(state, conditional.condition)
+        )
         return self.evaluate_finalization_for_values(
             state.player,
             state.opponent,
@@ -434,6 +541,26 @@ class RulesEngine:
             state.pending_cf_bonus,
             state.pressure,
             card,
+            temporary_player_attribute=(
+                conditional.temporary_player_attribute
+                if conditional_met and conditional is not None
+                else None
+            ),
+            temporary_player_modifier=(
+                conditional.temporary_player_modifier
+                if conditional_met and conditional is not None
+                else 0
+            ),
+            temporary_opponent_attribute=(
+                conditional.temporary_opponent_attribute
+                if conditional_met and conditional is not None
+                else None
+            ),
+            temporary_opponent_modifier=(
+                conditional.temporary_opponent_modifier
+                if conditional_met and conditional is not None
+                else 0
+            ),
         )
 
     def evaluate_finalization_for_values(
@@ -444,12 +571,29 @@ class RulesEngine:
         pending_cf_bonus: int,
         pressure: int,
         card: FinalizationCard,
+        *,
+        temporary_player_attribute: Attribute | None = None,
+        temporary_player_modifier: int = 0,
+        temporary_opponent_attribute: Attribute | None = None,
+        temporary_opponent_modifier: int = 0,
     ) -> FinalizationPreview:
-        """Versión pura de la CF para la búsqueda de decisiones."""
+        """Versión pura de la CF para la búsqueda de decisiones.
+
+        Los modificadores temporales se aplican solamente a las comparaciones
+        de la CF actual.
+        """
 
         for outcome in card.outcomes:
             if outcome.comparison is None or self.comparison_succeeds_for_teams(
-                player, opponent, rules, outcome.comparison, pending_cf_bonus
+                player,
+                opponent,
+                rules,
+                outcome.comparison,
+                pending_cf_bonus,
+                temporary_player_attribute=temporary_player_attribute,
+                temporary_player_modifier=temporary_player_modifier,
+                temporary_opponent_attribute=temporary_opponent_attribute,
+                temporary_opponent_modifier=temporary_opponent_modifier,
             ):
                 resolution = FinalizationResolution(
                     card_name=card.name,
@@ -494,14 +638,23 @@ class RulesEngine:
             conditional is not None
             and self._rival_condition_met(state, conditional.condition)
         )
+        temporary_player_attribute = None
+        temporary_player_modifier = 0
+        temporary_opponent_attribute = None
+        temporary_opponent_modifier = 0
         if conditional_met:
             assert conditional is not None
+            temporary_player_attribute = conditional.temporary_player_attribute
+            temporary_player_modifier = conditional.temporary_player_modifier
+            temporary_opponent_attribute = conditional.temporary_opponent_attribute
+            temporary_opponent_modifier = conditional.temporary_opponent_modifier
             if log:
                 self._log(state, "cf_condicional", conditional.label)
             self._apply_full_effect(state, conditional.effect, ai, log=log)
 
         # El resultado principal se determina después del condicional, usando
-        # exclusivamente el +CF que pertenecía a esta CF.
+        # exclusivamente el +CF que pertenecía a esta CF. Los modificadores
+        # temporales de atributo solo viven durante esta evaluación.
         preview = self.evaluate_finalization_for_values(
             state.player,
             state.opponent,
@@ -509,6 +662,10 @@ class RulesEngine:
             current_cf_bonus,
             state.pressure,
             instance.card,
+            temporary_player_attribute=temporary_player_attribute,
+            temporary_player_modifier=temporary_player_modifier,
+            temporary_opponent_attribute=temporary_opponent_attribute,
+            temporary_opponent_modifier=temporary_opponent_modifier,
         )
         self._apply_full_effect(state, preview.outcome.effect, ai, log=log)
 
@@ -521,6 +678,10 @@ class RulesEngine:
             outcome_kind=preview.resolution.outcome_kind,
             tier=preview.resolution.tier,
             conditional_met=conditional_met,
+            temporary_player_attribute=temporary_player_attribute,
+            temporary_player_modifier=temporary_player_modifier,
+            temporary_opponent_attribute=temporary_opponent_attribute,
+            temporary_opponent_modifier=temporary_opponent_modifier,
         )
         state.finalizations.append(resolution)
         if log:
@@ -572,7 +733,11 @@ class RulesEngine:
         # El condicional de la CR se comprueba y ejecuta ANTES de resolver
         # cualquiera de las acciones principales de la carta.
         conditional_met = self._rival_condition_met(state, card.conditional.condition)
+        temporary_opponent_attribute = None
+        temporary_opponent_modifier = 0
         if conditional_met:
+            temporary_opponent_attribute = card.conditional.temporary_opponent_attribute
+            temporary_opponent_modifier = card.conditional.temporary_opponent_modifier
             if log:
                 self._log(state, "cr_condicion", card.conditional.label)
             self._apply_full_effect(state, card.conditional.effect, effective_ai, log=log)
@@ -580,7 +745,12 @@ class RulesEngine:
         applied_action_index = None
         chosen_action = None
         for index, action in enumerate(card.actions):
-            if self.red_comparison_succeeds(state, action.comparison):
+            if self.red_comparison_succeeds(
+                state,
+                action.comparison,
+                temporary_opponent_attribute=temporary_opponent_attribute,
+                temporary_opponent_modifier=temporary_opponent_modifier,
+            ):
                 chosen_action = action
                 applied_action_index = index
                 break
@@ -599,6 +769,8 @@ class RulesEngine:
                 card=card,
                 applied_action_index=applied_action_index,
                 conditional_met=conditional_met,
+                temporary_opponent_attribute=temporary_opponent_attribute,
+                temporary_opponent_modifier=temporary_opponent_modifier,
                 player_goals=state.player_goals,
                 bot_goals_from_pressure=state.bot_goals_from_pressure,
                 bot_goals_from_red_cards=state.bot_goals_from_red_cards,
@@ -619,10 +791,22 @@ class RulesEngine:
         )
 
     @staticmethod
-    def red_comparison_succeeds(state: MatchState, comparison: RedComparison) -> bool:
-        """Compara el atributo rival contra el propio (más el margen)."""
+    def red_comparison_succeeds(
+        state: MatchState,
+        comparison: RedComparison,
+        *,
+        temporary_opponent_attribute: Attribute | None = None,
+        temporary_opponent_modifier: int = 0,
+    ) -> bool:
+        """Compara una CR aplicando, si procede, un modificador temporal al atributo rival."""
 
         rival_value = state.opponent.value(comparison.rival_attribute)
+        if (
+            temporary_opponent_attribute is not None
+            and comparison.rival_attribute is temporary_opponent_attribute
+        ):
+            rival_value += temporary_opponent_modifier
+
         player_value = state.player.value(comparison.player_attribute) + comparison.player_modifier
         if comparison.rival_must_be_lower:
             return rival_value < player_value
@@ -641,9 +825,9 @@ class RulesEngine:
     @staticmethod
     def _rival_condition_met(state: MatchState, condition: RivalCondition) -> bool:
         bot_goals = state.bot_goals_from_pressure + state.bot_goals_from_red_cards
-        if condition is RivalCondition.RIVAL_WINNING:
-            return bot_goals > state.player_goals
-        return bot_goals < state.player_goals
+        return RulesEngine._rival_condition_met_for_values(
+            state.player_goals, bot_goals, condition
+        )
 
     def _resolve_ai(self, ai: "AutomaticPlayerAI | None") -> "AutomaticPlayerAI":
         if ai is not None:

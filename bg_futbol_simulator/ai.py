@@ -182,14 +182,27 @@ class AutomaticPlayerAI:
 
     @staticmethod
     def _retention_score(assessment: HandCardAssessment) -> int:
-        """Valor compuesto: efecto útil, rendimiento y penalización por copia."""
+        """Valor compuesto para decidir qué CC conservar.
 
-        return (
-            assessment.best_effect_value
-            + assessment.usable_comparisons * 60
-            + assessment.potentially_usable_comparisons * 20
-            - (assessment.copies_in_hand - 1) * 15
+        Prioriza una CC por su impacto real, no únicamente por el número
+        de comparaciones disponibles. Las cartas con efecto base útil deben
+        sobrevivir aunque no tengan comparaciones activas en ese momento.
+        """
+
+        base_value = assessment.best_effect_value
+
+        # Las comparaciones activas son importantes, pero no deben eclipsar
+        # una carta con un efecto fuerte o una carta única.
+        comparison_value = (
+            assessment.usable_comparisons * 45
+            + assessment.potentially_usable_comparisons * 10
         )
+
+        # Repetir copias reduce el valor marginal de conservar otra copia,
+        # pero una copia única nunca recibe penalización.
+        duplicate_penalty = max(0, assessment.copies_in_hand - 1) * 35
+
+        return base_value + comparison_value - duplicate_penalty
 
     @staticmethod
     def _event_option_value(state: MatchState, option: EventOption) -> int:

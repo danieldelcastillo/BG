@@ -18,35 +18,42 @@ def _simulate(
     engine: RulesEngine,
     player: Team,
     opponent: Team,
-    matches: int,
-    base_seed: int,
+    seeds: list[int],
 ) -> tuple[int, int, int, int, int, int, int, int]:
-    """Ejecuta ``matches`` partidos y devuelve V/E/D, goles totales, CR robadas
-    y tarjetas rojas totales (al bot y propias)."""
+    """Ejecuta un partido por cada semilla recibida y devuelve las estadísticas."""
 
-    rng = random.Random(base_seed)
     wins = draws = losses = 0
     total_goals = 0
     total_bot_goals = 0
     total_cr_draws = 0
     total_bot_red_cards = 0
     total_player_red_cards = 0
-    for _ in range(matches):
-        seed = rng.randrange(2**63)
-        state = engine.create_match_state(player, opponent, random.Random(seed))
-        result: MatchResult = engine.play_match(state, AutomaticPlayerAI(engine))
+
+    for seed in seeds:
+        state = engine.create_match_state(
+            player,
+            opponent,
+            random.Random(seed),
+        )
+        result: MatchResult = engine.play_match(
+            state,
+            AutomaticPlayerAI(engine),
+        )
+
         bot_goals = result.bot_goals
         total_goals += result.player_goals
         total_bot_goals += bot_goals
         total_cr_draws += result.cr_draws
         total_bot_red_cards += result.red_cards
         total_player_red_cards += result.player_red_cards
+
         if result.player_goals > bot_goals:
             wins += 1
         elif bot_goals > result.player_goals:
             losses += 1
         else:
             draws += 1
+
     return (
         wins,
         draws,
@@ -59,11 +66,38 @@ def _simulate(
     )
 
 
+def _generate_unique_seeds(rng: random.Random, count: int) -> list[int]:
+    """Genera exactamente ``count`` semillas únicas de 63 bits.
+
+    No usa random.sample(range(2**63), ...), porque en Windows ese range
+    no puede convertirse en un tamaño C ssize_t para ``random.sample``.
+    """
+
+    seeds: list[int] = []
+    used: set[int] = set()
+
+    while len(seeds) < count:
+        seed = rng.getrandbits(63)
+        if seed not in used:
+            used.add(seed)
+            seeds.append(seed)
+
+    return seeds
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Tabla de equilibrio: V/E/D, % de victoria y goles medios según la diferencia de atributos."
+        description=(
+            "Tabla de equilibrio: V/E/D, % de victoria y goles medios "
+            "según la diferencia de atributos."
+        )
     )
-    parser.add_argument("--matches", type=int, default=100, help="Partidos a simular por cada nivel de atributos.")
+    parser.add_argument(
+        "--matches",
+        type=int,
+        default=100,
+        help="Partidos a simular por cada nivel de atributos.",
+    )
     parser.add_argument(
         "--bot",
         type=int,
@@ -87,12 +121,22 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.matches < 1:
+        parser.error("--matches debe ser al menos 1.")
+
     if args.seed is None:
         args.seed = int.from_bytes(os.urandom(8), "big")
 
     engine = RulesEngine()
     opponent = Team(*args.bot)
     opponent_total = opponent.defense + opponent.midfield + opponent.attack
+
+    # Una única secuencia de semillas para TODA la ejecución.
+    # Ejemplo: 100 partidos x 7 niveles = 700 semillas únicas.
+    total_matches = args.matches * len(args.player_levels)
+    seed_rng = random.Random(args.seed)
+    all_seeds = _generate_unique_seeds(seed_rng, total_matches)
+    seed_cursor = 0
 
     print("=" * 88)
     print("      BG FÚTBOL — Informe de equilibrio por diferencia de atributos")
@@ -101,6 +145,7 @@ def main() -> None:
         f"Bot fijo: {opponent.defense}/{opponent.midfield}/{opponent.attack}"
         f"  ·  Partidos por nivel: {args.matches}  ·  Semilla base: {args.seed}"
     )
+    print(f"Semillas de partido: {total_matches} únicas en toda la ejecución")
     print()
 
     columns = (
@@ -124,6 +169,7 @@ def main() -> None:
         player = Team(level, level, level)
         player_total = level * 3
         gap = opponent_total - player_total
+
         if gap > 0:
             gap_label = f"+{gap} (peor)"
         elif gap < 0:
@@ -131,9 +177,25 @@ def main() -> None:
         else:
             gap_label = "0 (igual)"
 
-        wins, draws, losses, total_goals, total_bot_goals, total_cr_draws, total_bot_red_cards, total_player_red_cards = _simulate(
-            engine, player, opponent, args.matches, args.seed
+        level_seeds = all_seeds[seed_cursor:seed_cursor + args.matches]
+        seed_cursor += args.matches
+
+        (
+            wins,
+            draws,
+            losses,
+            total_goals,
+            total_bot_goals,
+            total_cr_draws,
+            total_bot_red_cards,
+            total_player_red_cards,
+        ) = _simulate(
+            engine,
+            player,
+            opponent,
+            level_seeds,
         )
+
         win_pct = wins / args.matches * 100
         avg_goals = total_goals / args.matches
         avg_bot_goals = total_bot_goals / args.matches

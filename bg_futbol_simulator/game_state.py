@@ -255,13 +255,22 @@ class ControlPlan:
 
 @dataclass(frozen=True, slots=True)
 class FinalizationResolution:
-    """Resultado seleccionado al resolver una CF y su condicional independiente."""
+    """Resultado seleccionado al resolver una CF y su condicional independiente.
+
+    Los campos de modificador temporal registran, si existió, el atributo
+    afectado durante las comparaciones de esta CF. El equipo nunca se muta para
+    conservar ese modificador.
+    """
 
     card_name: str
     outcome_name: str
     outcome_kind: OutcomeKind
     tier: int
     conditional_met: bool = False
+    temporary_player_attribute: Attribute | None = None
+    temporary_player_modifier: int = 0
+    temporary_opponent_attribute: Attribute | None = None
+    temporary_opponent_modifier: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,13 +288,17 @@ class RedCardResolution:
     ``applied_action_index`` es 0 o 1 si se aplicó la primera o la segunda
     acción por comparación; ``None`` si ninguna se cumplió y se aplicó el
     efecto de reserva. ``conditional_met`` indica si, de forma independiente,
-    también se aplicó el efecto de la esquina inferior izquierda. El resto de
-    campos son una fotografía del estado justo tras resolver esta CR.
+    también se aplicó el efecto de la esquina inferior izquierda.
+    ``temporary_opponent_attribute`` y ``temporary_opponent_modifier`` registran
+    el modificador temporal usado únicamente para las comparaciones de esta CR.
+    El resto de campos son una fotografía del estado justo tras resolver esta CR.
     """
 
     card: RedCard
     applied_action_index: int | None
     conditional_met: bool
+    temporary_opponent_attribute: Attribute | None
+    temporary_opponent_modifier: int
     player_goals: int
     bot_goals_from_pressure: int
     bot_goals_from_red_cards: int

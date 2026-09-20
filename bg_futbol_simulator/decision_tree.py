@@ -181,6 +181,15 @@ class DecisionTree:
         position: _DecisionPosition,
         finalization: FinalizationCard,
     ):
+        conditional = finalization.conditional
+        conditional_met = (
+            conditional is not None
+            and self.engine._rival_condition_met_for_values(
+                position.player_goals,
+                position.bot_goals,
+                conditional.condition,
+            )
+        )
         return self.engine.evaluate_finalization_for_values(
             state.player,
             state.opponent,
@@ -188,6 +197,26 @@ class DecisionTree:
             position.pending_cf_bonus,
             position.pressure,
             finalization,
+            temporary_player_attribute=(
+                conditional.temporary_player_attribute
+                if conditional_met and conditional is not None
+                else None
+            ),
+            temporary_player_modifier=(
+                conditional.temporary_player_modifier
+                if conditional_met and conditional is not None
+                else 0
+            ),
+            temporary_opponent_attribute=(
+                conditional.temporary_opponent_attribute
+                if conditional_met and conditional is not None
+                else None
+            ),
+            temporary_opponent_modifier=(
+                conditional.temporary_opponent_modifier
+                if conditional_met and conditional is not None
+                else 0
+            ),
         )
 
     def _apply_play(
@@ -200,12 +229,27 @@ class DecisionTree:
 
         card = self._control_cards[play.card_definition_id]
         option = card.option(play.option_key)
+        (
+            temporary_player_attribute,
+            temporary_player_modifier,
+            temporary_opponent_attribute,
+            temporary_opponent_modifier,
+            _conditional_met,
+        ) = self.engine.temporary_control_modifiers_for_values(
+            position.player_goals,
+            position.bot_goals,
+            card.conditional,
+        )
         if option.comparison is not None and not self.engine.comparison_succeeds_for_teams(
             state.player,
             state.opponent,
             state.rules,
             option.comparison,
             position.pending_cc_bonus,
+            temporary_player_attribute=temporary_player_attribute,
+            temporary_player_modifier=temporary_player_modifier,
+            temporary_opponent_attribute=temporary_opponent_attribute,
+            temporary_opponent_modifier=temporary_opponent_modifier,
         ):
             return None
 
