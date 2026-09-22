@@ -68,6 +68,11 @@ class Effect:
     recover_control_cards: int = 0
     play_random_discard_finalizations: int = 0
     draw_red_cards: int = 0
+    penalty_goal_probability: float = 0.0
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.penalty_goal_probability <= 1.0:
+            raise ValueError("La probabilidad de gol de penalti debe estar entre 0 y 1.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -472,7 +477,7 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Comparison(Attribute.MED, Attribute.DEF, 11),
             Effect(cf_bonus=9, pressure_delta=1),
             Comparison(Attribute.AT, Attribute.DEF, 0),
-            Effect(cc_bonus=11),
+            Effect(cc_bonus=9),
             condicional_cc(
                 RivalCondition.RIVAL_LOSING,
                 temporary_player_attribute=Attribute.AT,
@@ -773,7 +778,12 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 "Tarjeta amarilla par el rival, descarta una carta del mazo, y -5 a la presión",
                 OutcomeKind.YELLOW_CARD,
                 2,
-                Effect(yellow_cards=1, discard_top_cards=1, pressure_delta=-5),
+                Effect(
+                    yellow_cards=1,
+                    discard_top_cards=1,
+                    pressure_delta=-5,
+                    penalty_goal_probability=0.50,
+                ),
                 strict_comparison(Attribute.AT, Attribute.DEF, 7),
             ),
             FinalizationOutcome(
@@ -1051,7 +1061,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "robo_mediocampo",
             "Robo en medio campo",
-            _red_action(Attribute.DEF, Attribute.MED, 1, Effect(pressure_delta=4, discard_control_cards=1)),
+            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4, discard_control_cards=1)),
             _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=4)),
             Effect(pressure_delta=3, discard_control_cards=1),
             _red_conditional(

@@ -101,6 +101,8 @@ def _effect_text(effect: Effect) -> str:
         parts.append("juega una CF aleatoria del descarte")
     if effect.draw_red_cards:
         parts.append(f"juega {effect.draw_red_cards} CR adicional(es)")
+    if effect.penalty_goal_probability:
+        parts.append(f"penalti: {effect.penalty_goal_probability:.0%} de gol")
     return "; ".join(parts) or "sin efecto adicional"
 
 
@@ -192,6 +194,7 @@ def _hand_text(state: MatchState) -> str:
 
 
 _SPECTACULAR_BANNERS: dict[str, str] = {
+    "penalti": "### 🥅⚽ ¡PENALTI!",
     "gol_jugador": "## 🏆⚽🎉🎊 ¡¡¡GOOOOOOL DE TU EQUIPO!!! 🎊🎉⚽🏆",
     "gol_bot_presion": "## 🚨⚽💥 ¡¡¡GOOOOOOL DEL BOT!!! 💥⚽🚨",
     "gol_en_contra": "## 🚨⚽😱 ¡¡¡GOL EN CONTRA (CR)!!! 😱⚽🚨",

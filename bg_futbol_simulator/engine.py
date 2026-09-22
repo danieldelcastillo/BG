@@ -864,6 +864,25 @@ class RulesEngine:
         if effect.goals and log:
             self._log(state, "gol_jugador", "¡Gol del jugador!")
             self._log(state, "broma", _pick_joke(state, _GOAL_FOR_JOKES))
+
+        # Penalti: es una comprobación aleatoria independiente del efecto
+        # principal. La carta "Provocar la falta" configura un 50% de gol.
+        if effect.penalty_goal_probability:
+            roll = state.randomizer.random()
+            scored = roll < effect.penalty_goal_probability
+            if scored:
+                state.player_goals += 1
+            if log:
+                probability_text = f"{effect.penalty_goal_probability:.0%}"
+                result_text = "¡GOOOOOL!" if scored else "¡PARADA / PENALTI FALLADO!"
+                self._log(
+                    state,
+                    "penalti",
+                    f"¡PENALTI!!! {result_text} "
+                    f"(probabilidad de gol {probability_text}; tirada {roll:.3f})",
+                )
+                if scored:
+                    self._log(state, "broma", _pick_joke(state, _GOAL_FOR_JOKES))
         state.bot_goals_from_red_cards += effect.bot_goals
         if effect.bot_goals and log:
             self._log(state, "gol_en_contra", "Gol en contra por una CR")
