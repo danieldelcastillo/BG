@@ -14,6 +14,7 @@ from bg_futbol_simulator.cards import (
     RivalCondition,
     build_match_deck,
     card_catalogue,
+    red_card_catalogue,
 )
 from bg_futbol_simulator.engine import RulesEngine
 from bg_futbol_simulator.game_state import ControlPlay, MatchRules, MatchState, Team
@@ -87,15 +88,15 @@ class EngineTests(unittest.TestCase):
         ]
 
         self.engine.apply_control_play(state, ControlPlay("build_from_back", "base"))
-        self.assertEqual(1, state.pending_cc_bonus)
+        self.assertEqual(3, state.pending_cc_bonus)
 
         # MED 15 + el bono +CC supera MED 15 + 1. La recompensa genera un
         # nuevo +CC para la siguiente carta, no conserva el anterior.
         self.engine.apply_control_play(state, ControlPlay("wing_play", "comparison_2"))
-        self.assertEqual(1, state.pending_cc_bonus)
+        self.assertEqual(11, state.pending_cc_bonus)
 
         self.engine.apply_control_play(state, ControlPlay("aggressive_recovery", "base"))
-        self.assertEqual(0, state.pending_cc_bonus)
+        self.assertEqual(4, state.pending_cc_bonus)
 
     def test_cf_bonus_accumulates_and_is_consumed_on_resolution(self) -> None:
         state = _state()
@@ -103,15 +104,15 @@ class EngineTests(unittest.TestCase):
         finalization = _instance("one_on_one")
         resolution = self.engine.resolve_finalization(state, finalization)
 
-        self.assertEqual(2, resolution.tier)
-        self.assertEqual(1, state.player_goals)
+        self.assertEqual(1, resolution.tier)
+        self.assertEqual(0, state.player_goals)
         self.assertEqual(0, state.pending_cf_bonus)
 
     def test_updated_finalization_comparisons_are_strict(self) -> None:
-        state = _state()
+        state = _state(player=Team(15, 15, 14))
         one_on_one = _instance("one_on_one")
 
-        # AT 15 no supera estrictamente DEF 15: se llega al fallo.
+        # AT 14 no supera estrictamente DEF 15 - 1: se llega al fallo.
         self.assertEqual(
             "Roba 1 CR",
             self.engine.evaluate_finalization(state, one_on_one.card).resolution.outcome_name,
@@ -119,7 +120,7 @@ class EngineTests(unittest.TestCase):
 
         state.pending_cf_bonus = 1
         self.assertEqual(
-            "+1 Presión",
+            "Descarta 1 CC de la mano y +1 Presión",
             self.engine.evaluate_finalization(state, one_on_one.card).resolution.outcome_name,
         )
 
@@ -155,13 +156,12 @@ class EngineTests(unittest.TestCase):
         resolution = self.engine.resolve_finalization(state, finalization)
 
         # Primero baja 4 la presión (7 -> 3) y después el resultado principal
-        # añade 4 (3 -> 7). Si se ejecutara al revés, el +4 provocaría un gol
-        # del bot y la presión terminaría en 0.
+        # añade 1 (3 -> 4). El orden se registra antes de resolver la CF.
         self.assertEqual(
-            "Descarta 1 CC de la mano y +4 Presión",
+            "Descarta 1 CC de la mano y +1 Presión",
             resolution.outcome_name,
         )
-        self.assertEqual(7, state.pressure)
+        self.assertEqual(4, state.pressure)
         self.assertEqual(1, state.bot_goals_from_pressure)
         kinds = [event.kind for event in state.events]
         self.assertLess(kinds.index("cf_condicional"), kinds.index("resuelve_cf"))
@@ -184,10 +184,10 @@ class EngineTests(unittest.TestCase):
 
         self.engine.resolve_red_card(state, instance)
 
-        # Primero 5 -> 1 por el condicional y luego +7 por la acción principal:
-        # el resultado es 8. Al revés, 5 -> 12 provocaría gol del bot y después
-        # la presión bajaría a 0.
-        self.assertEqual(8, state.pressure)
+        # Primero 5 -> 1 por el condicional y luego +4 por la acción principal:
+        # el resultado es 5. El condicional siempre se resuelve antes de las
+        # comparaciones y de la acción principal.
+        self.assertEqual(5, state.pressure)
         self.assertEqual(1, state.bot_goals_from_pressure)
         kinds = [event.kind for event in state.events]
         self.assertLess(kinds.index("cr_condicion"), kinds.index("cr_accion"))
@@ -226,9 +226,41 @@ class EngineTests(unittest.TestCase):
         cutback = _instance("cutback")
 
         self.assertEqual(
-            "Gol",
+            "+2 Presión",
             self.engine.evaluate_finalization(state, cutback.card).resolution.outcome_name,
         )
+
+    def test_long_shot_default_draws_a_red_card_without_discarding_control(self) -> None:
+        state = _state(player=Team(15, 15, 13))
+        kept_control = _instance("individual_action")
+        state.hand = [kept_control]
+
+        resolution = self.engine.resolve_finalization(state, _instance("long_shot"))
+
+        self.assertEqual("Roba 1 CR", resolution.outcome_name)
+        self.assertEqual(1, state.cr_draws)
+        self.assertEqual([kept_control], state.hand)
+
+    def test_long_shot_intermediate_adds_pressure_and_discards_control(self) -> None:
+        state = _state(player=Team(15, 15, 14))
+        discarded_control = _instance("individual_action")
+        state.hand = [discarded_control]
+
+        resolution = self.engine.resolve_finalization(state, _instance("long_shot"))
+
+        self.assertEqual("+2 Presión y descarta una CC", resolution.outcome_name)
+        self.assertEqual(2, state.pressure)
+        self.assertEqual([], state.hand)
+        self.assertIn(discarded_control, state.discard_pile)
+
+    def test_midfield_theft_red_card_uses_the_updated_effects(self) -> None:
+        card = red_card_catalogue()["robo_mediocampo"]
+
+        self.assertEqual(4, card.actions[0].effect.pressure_delta)
+        self.assertEqual(0, card.actions[0].effect.discard_control_cards)
+        self.assertEqual(5, card.actions[1].effect.pressure_delta)
+        self.assertEqual(4, card.fallback_effect.pressure_delta)
+        self.assertEqual(1, card.fallback_effect.discard_control_cards)
 
     def test_top_deck_discard_skips_card_effects(self) -> None:
         state = _state()

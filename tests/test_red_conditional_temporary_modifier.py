@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from .cards import (
+from bg_futbol_simulator.cards import (
     Attribute,
     CardInstance,
     Effect,
@@ -12,8 +12,8 @@ from .cards import (
     _red_card,
     _red_conditional,
 )
-from .engine import RulesEngine
-from .game_state import MatchRules, MatchState, Team
+from bg_futbol_simulator.engine import RulesEngine
+from bg_futbol_simulator.game_state import MatchRules, MatchState, Team
 
 
 class RedConditionalTemporaryModifierTests(unittest.TestCase):

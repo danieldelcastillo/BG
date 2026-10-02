@@ -726,17 +726,17 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "long_shot", "Disparo lejano", high_goal(Attribute.AT, 10),
             FinalizationOutcome(
-                "+2 Presión",
+                "+2 Presión y descarta una CC",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(pressure_delta=2),
+                Effect(pressure_delta=2, discard_control_cards=1),
                 strict_comparison(Attribute.AT, Attribute.DEF, -2),
             ),
             FinalizationOutcome(
-                "Descarta una CC de la mano y roba 1 CR",
+                "Roba 1 CR",
                 OutcomeKind.CR_DRAW,
                 0,
-                Effect(discard_control_cards=1, cr_draws=1),
+                Effect(cr_draws=1),
             ),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,
@@ -1051,8 +1051,8 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "centro_area_rival",
             "Centro al área",
             _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=4)),
-            _red_action(Attribute.AT, Attribute.DEF, 0, Effect(pressure_delta=3, discard_top_cards=2)),
-            Effect(pressure_delta=3, discard_control_cards=1),
+            _red_action(Attribute.AT, Attribute.DEF, 0, Effect(pressure_delta=4, discard_top_cards=2)),
+            Effect(pressure_delta=4, discard_control_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(pressure_delta=4),
@@ -1061,9 +1061,9 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "robo_mediocampo",
             "Robo en medio campo",
-            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4, discard_control_cards=1)),
-            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=4)),
-            Effect(pressure_delta=3, discard_control_cards=1),
+            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4)),
+            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=5)),
+            Effect(pressure_delta=4, discard_control_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(discard_control_cards=1, pressure_delta=3),

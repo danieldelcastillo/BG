@@ -12,7 +12,7 @@ class OneNilStrategyTests(unittest.TestCase):
     def test_before_two_cr_keeps_controls_when_they_cannot_score(self) -> None:
         engine = RulesEngine()
         state = MatchState(
-            player=Team(15, 15, 15),
+            player=Team(15, 15, 14),
             opponent=Team(15, 15, 15),
             rules=MatchRules(),
             deck=[],
@@ -23,13 +23,13 @@ class OneNilStrategyTests(unittest.TestCase):
             state, card_catalogue()["one_on_one"]
         )
 
-        # +1 CF evita la CR, pero no alcanza el gol: se guarda para después.
+        # +3 CF evita la CR, pero no alcanza el gol: se guarda para después.
         self.assertEqual(0, plan.cards_spent)
 
     def test_from_two_cr_prefers_avoiding_another_cr_to_saving_cards(self) -> None:
         engine = RulesEngine()
         state = MatchState(
-            player=Team(15, 15, 15),
+            player=Team(15, 15, 14),
             opponent=Team(15, 15, 15),
             rules=MatchRules(),
             deck=[],
@@ -43,13 +43,13 @@ class OneNilStrategyTests(unittest.TestCase):
         preview = engine.evaluate_finalization(state, finalization)
 
         self.assertEqual(1, plan.cards_spent)
-        self.assertEqual("+1 Presión", preview.resolution.outcome_name)
+        self.assertEqual("Descarta 1 CC de la mano y +1 Presión", preview.resolution.outcome_name)
         self.assertEqual(0, preview.outcome.effect.cr_draws)
 
     def test_after_first_goal_strategy_avoids_cr_without_scoring_again(self) -> None:
         engine = RulesEngine()
         state = MatchState(
-            player=Team(15, 15, 15),
+            player=Team(15, 15, 14),
             opponent=Team(15, 15, 15),
             rules=MatchRules(),
             deck=[],
@@ -63,6 +63,6 @@ class OneNilStrategyTests(unittest.TestCase):
         preview = engine.evaluate_finalization(state, finalization)
 
         self.assertEqual(1, plan.cards_spent)
-        self.assertEqual("+1 Presión", preview.resolution.outcome_name)
+        self.assertEqual("Descarta 1 CC de la mano y +1 Presión", preview.resolution.outcome_name)
         self.assertEqual(0, preview.outcome.effect.goals)
         self.assertEqual(0, preview.outcome.effect.cr_draws)

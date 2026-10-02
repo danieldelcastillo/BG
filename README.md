@@ -1,11 +1,10 @@
 # BG FÚTBOL — simulador del sistema de partido
 
-Motor Python para ejecutar el mazo de 28 CC, 12 CF y 10 CE, resolver las
-comparaciones y elegir automáticamente la mejor secuencia de cartas de control
-antes de cada finalización.
-
-El detalle completo de todas las cartas y reglas está en
-[`COMPENDIO_REGLAS_Y_CARTAS.md`](COMPENDIO_REGLAS_Y_CARTAS.md).
+Motor Python para simular partidos de BG FÚTBOL. Ejecuta un mazo de partido de
+28 cartas de control (CC), 12 de finalización (CF) y 10 de evento (CE), además
+de un mazo independiente de 16 cartas rojas (CR: 8 tipos con 2 copias cada
+uno). Resuelve comparaciones, efectos y decisiones de la IA antes de cada
+finalización.
 
 La IA explora las secuencias legales por capas, no mediante muestreo. Prioriza:
 
@@ -22,15 +21,17 @@ llegan al mismo estado de mano y bonos.
 
 | Archivo | Responsabilidad |
 | --- | --- |
-| `bg_futbol_simulator/cards.py` | Datos inmutables de CC, CF, CE, comparaciones y efectos. |
+| `bg_futbol_simulator/cards.py` | Datos inmutables de CC, CF, CE y CR, comparaciones y efectos. |
 | `bg_futbol_simulator/game_state.py` | Equipos, estado mutable del partido, órdenes y resultados. |
 | `bg_futbol_simulator/engine.py` | Único módulo que resuelve y muta las reglas. |
 | `bg_futbol_simulator/decision_tree.py` | Exploración exacta, por capas y con memoización. |
 | `bg_futbol_simulator/ai.py` | IA automática que solicita el mejor plan. |
 | `bg_futbol_simulator/simulation.py` | Tandas reproducibles y paralelizables de 1 a 1.000.000 partidos. |
 | `bg_futbol_simulator/statistics.py` | Agregación de métricas y frecuencias de resultados. |
+| `bg_futbol_simulator/strategies.py` | Estrategia estándar y estrategia de buscar 1–0 con pocas CR. |
+| `bg_futbol_simulator/trace.py` | Generación de informes Markdown, carta por carta. |
 | `main.py` | Interfaz de línea de comandos. |
-| `tests/` | Pruebas de mazo, bonos, descarte, IA y reproducibilidad. |
+| `tests/` | Pruebas del motor, mazos, IA, gestión de mano y reproducibilidad. |
 
 ## Ejecutar
 
@@ -76,8 +77,15 @@ guarda en `reports/` y el Explorador de archivos muestra el resultado recién
 creado seleccionado.
 
 La salida es JSON e incluye goles del jugador, goles del bot por presión, goles
-del bot por CR (actualmente 0), CR robadas, tarjetas, presión final, cartas en
-mano y frecuencia de cada resultado de CF.
+del bot por CR, CR robadas, tarjetas, sustituciones por lesión, presión final,
+cartas en mano y frecuencia de cada resultado de CF.
+
+Para comparar el equilibrio de distintos niveles de atributos frente a un bot
+fijo, se puede usar el segundo lanzador de Windows o ejecutar:
+
+```powershell
+python -m bg_futbol_simulator.balance_report --matches 100 --bot 15 15 15 --player-levels 12 13 14 15 16 17 18 --seed 7
+```
 
 ## Reglas de flujo fijadas en esta primera versión
 
@@ -111,10 +119,15 @@ que puedan cambiarse sin tocar las cartas:
   existe plantilla individual, esa sustitución no altera los atributos globales
   del equipo.
 - «Descarta la primera carta del mazo» quita esa carta sin resolverla.
-- Las CR todavía no tienen mazo ni efectos especificados: el motor registra
-  cada robo de CR para poder integrar sus reglas después sin falsear los datos.
-- No se inventa un turno ofensivo del rival ni un marcador rival, porque esa
-  parte del sistema de partido no figura en las reglas recibidas.
+- Las CR se roban y se resuelven al instante desde un mazo separado, sin
+  devolverse al mazo. Cada CR aplica primero, si procede, su efecto condicional
+  de marcador y después una única acción: la primera comparación que cumpla o
+  su efecto de reserva. Algunas condiciones modifican temporalmente un atributo
+  rival para las comparaciones de esa CR.
+- Un gol en contra causado por una CR se registra por separado de los goles del
+  bot por presión. Ambos forman el total de goles del bot.
+- No hay turno ofensivo independiente del rival: su intervención se modela
+  mediante presión, efectos de cartas y CR.
 
 ## Pruebas
 
@@ -122,6 +135,5 @@ que puedan cambiarse sin tocar las cartas:
 python -m unittest discover -s tests -v
 ```
 
-Las pruebas cubren las 40 cartas del mazo, el consumo de `+CC`/`+CF`, el
-descarte de la parte superior del mazo, las prioridades de la IA y la
-reproducibilidad con semilla.
+Las pruebas cubren la composición del mazo de partido, bonos `+CC`/`+CF`,
+descarte, decisiones de IA, efectos de CR y reproducibilidad con semilla.
