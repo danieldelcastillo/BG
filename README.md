@@ -103,9 +103,9 @@ que puedan cambiarse sin tocar las cartas:
 - Un `+CC` se suma al atributo del jugador en la siguiente comparación de CC y
   se consume al jugar esa carta. Un `+CF` se acumula y se suma al atributo del
   jugador al resolver la siguiente CF; entonces se consume.
-- La mano inicial es siempre 0. La presión se mantiene entre 0 y 9; si un
-  efecto la lleva por encima de 9, el bot marca un gol por presión y el
-  contador vuelve a 0. El umbral está configurado en `MatchRules`.
+- La presión inicial es 5. Si un efecto la reduce a 0 o menos, el jugador marca
+  y la presión vuelve a 5; si la eleva a 10 o más, marca el bot y también
+  vuelve a 5. Estos valores están configurados en `MatchRules`.
 - La mano tiene un límite estricto de 5 CC. Al robar una sexta, la IA descarta
   la menos útil según una valoración combinada de comparaciones aprovechables,
   mejor efecto disponible y redundancia de copias; la política está aislada en

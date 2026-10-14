@@ -139,7 +139,7 @@ class EngineTests(unittest.TestCase):
         # se suma de forma independiente cuando el rival va ganando.
         self.assertEqual("Roba 1 CR", resolution.outcome_name)
         self.assertEqual(1, state.cr_draws)
-        self.assertEqual(2, state.pressure)
+        self.assertEqual(7, state.pressure)
         self.assertIn("cf_condicional", [event.kind for event in state.events])
 
 
@@ -204,7 +204,7 @@ class EngineTests(unittest.TestCase):
 
         self.assertEqual("Roba 1 CR", resolution.outcome_name)
         self.assertEqual(1, state.cr_draws)
-        self.assertEqual(0, state.pressure)
+        self.assertEqual(5, state.pressure)
         self.assertNotIn("cf_condicional", [event.kind for event in state.events])
 
     def test_cf_conditional_can_use_rival_losing_condition(self) -> None:
@@ -218,7 +218,7 @@ class EngineTests(unittest.TestCase):
 
         self.engine.resolve_finalization(state, finalization)
 
-        self.assertEqual(3, state.pressure)
+        self.assertEqual(8, state.pressure)
         self.assertIn("cf_condicional", [event.kind for event in state.events])
 
     def test_updated_cutback_uses_midfield(self) -> None:
@@ -249,7 +249,7 @@ class EngineTests(unittest.TestCase):
         resolution = self.engine.resolve_finalization(state, _instance("long_shot"))
 
         self.assertEqual("+2 Presión y descarta una CC", resolution.outcome_name)
-        self.assertEqual(2, state.pressure)
+        self.assertEqual(7, state.pressure)
         self.assertEqual([], state.hand)
         self.assertIn(discarded_control, state.discard_pile)
 
@@ -270,6 +270,27 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(1, effect.discard_control_cards)
         self.assertEqual(0, effect.recover_control_cards)
 
+    def test_updated_pressure_effects_for_corner_red_cards_and_time_wasting(self) -> None:
+        corner = card_catalogue()["win_corner"]
+        self.assertEqual("-4 Presión", corner.outcomes[0].name)
+        self.assertEqual(-4, corner.outcomes[0].effect.pressure_delta)
+
+        for definition_id in ("accion_individual_rival", "balon_parado"):
+            effect = red_card_catalogue()[definition_id].actions[0].effect
+            self.assertEqual(6, effect.pressure_delta)
+            self.assertEqual(0, effect.bot_goals)
+
+        time_wasting = card_catalogue()["time_wasting"]
+        self.assertEqual(-3, time_wasting.options[2].effect.pressure_delta)
+
+    def test_game_control_comparison_options_use_the_mitigated_pressure_cost(self) -> None:
+        card = card_catalogue()["game_control"]
+
+        self.assertEqual(-2, card.options[1].effect.pressure_delta)
+        self.assertEqual(9, card.options[1].effect.cc_bonus)
+        self.assertEqual(-2, card.options[2].effect.pressure_delta)
+        self.assertEqual(7, card.options[2].effect.cc_bonus)
+
     def test_top_deck_discard_skips_card_effects(self) -> None:
         state = _state()
         discarded = _instance("one_on_one")
@@ -282,15 +303,33 @@ class EngineTests(unittest.TestCase):
         self.assertIn(discarded, state.discard_pile)
         self.assertEqual([], state.finalizations)
 
-    def test_exceeding_pressure_nine_gives_bot_a_goal_and_resets_pressure(self) -> None:
+    def test_reaching_pressure_ten_gives_bot_a_goal_and_resets_pressure(self) -> None:
         state = _state()
         state.pressure = 9
         state.hand = [_instance("through_ball")]
 
         self.engine.apply_control_play(state, ControlPlay("through_ball", "base"))
 
-        self.assertEqual(0, state.pressure)
+        self.assertEqual(5, state.pressure)
         self.assertEqual(1, state.bot_goals_from_pressure)
+
+    def test_reaching_pressure_zero_gives_player_a_goal_and_resets_pressure(self) -> None:
+        state = _state()
+        state.pressure = 5
+
+        self.engine.apply_effect(state, Effect(pressure_delta=-5))
+
+        self.assertEqual(5, state.pressure)
+        self.assertEqual(1, state.player_goals)
+
+    def test_high_finalization_reduces_pressure_instead_of_scoring_directly(self) -> None:
+        state = _state(player=Team(15, 15, 26))
+
+        resolution = self.engine.resolve_finalization(state, _instance("one_on_one"))
+
+        self.assertEqual("-5 Presión", resolution.outcome_name)
+        self.assertEqual(5, state.pressure)
+        self.assertEqual(1, state.player_goals)
 
     def test_sixth_control_card_forces_a_hand_discard(self) -> None:
         state = _state()
@@ -318,6 +357,20 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(1, len(state.events_resolved))
         self.assertEqual("Fuera de juego", state.events_resolved[0].card_name)
         self.assertEqual(1, state.cr_draws)
+
+    def test_event_ai_prefers_option_that_reaches_zero_pressure(self) -> None:
+        state = _state()
+        state.pressure = 2
+        event = card_catalogue()["time_wasting"]
+        self.assertIsInstance(event, EventCard)
+
+        option = AutomaticPlayerAI(self.engine).choose_event_option(state, event)
+
+        _, player_goal, bot_goal = self.engine.pressure_after_delta(
+            state.rules, state.pressure, option.effect.pressure_delta
+        )
+        self.assertTrue(player_goal)
+        self.assertFalse(bot_goal)
 
     def test_offside_option_one_discards_deck_card_and_control_from_hand(self) -> None:
         state = _state()

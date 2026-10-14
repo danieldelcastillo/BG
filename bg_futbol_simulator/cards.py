@@ -565,9 +565,9 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             3,
             Effect(cc_bonus=5, discard_top_cards=1),
             Comparison(Attribute.MED, Attribute.MED, 2),
-            Effect(pressure_delta=-5, cc_bonus=9),
+            Effect(pressure_delta=-2, cc_bonus=9),
             Comparison(Attribute.MED, Attribute.MED, -1),
-            Effect(pressure_delta=-4, cc_bonus=7),
+            Effect(pressure_delta=-2, cc_bonus=7),
             condicional_cc(
                 RivalCondition.RIVAL_WINNING,
                 temporary_player_attribute=Attribute.MED,
@@ -663,7 +663,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         return Comparison(player_attribute, opponent_attribute, modifier, ties_succeed=False)
 
     high_goal = lambda attribute, modifier: FinalizationOutcome(
-        "Gol", OutcomeKind.GOAL, 2, Effect(goals=1),
+        "-5 Presión", OutcomeKind.PRESSURE_REDUCTION, 2, Effect(pressure_delta=-5),
         strict_comparison(attribute, Attribute.DEF, modifier),
     )
     cr = lambda: FinalizationOutcome("Roba 1 CR", OutcomeKind.CR_DRAW, 0, Effect(cr_draws=1))
@@ -673,12 +673,12 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "one_on_one", 
             "Mano a mano", 
-            high_goal(Attribute.AT, 10),
+            high_goal(Attribute.AT, 9),
             FinalizationOutcome(
                 "Descarta 1 CC de la mano y +1 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(discard_control_cards=1, pressure_delta=1),
+                Effect(discard_control_cards=1, pressure_delta=2),
                 strict_comparison(Attribute.AT, Attribute.DEF, -1),
             ),
             cr(),
@@ -703,7 +703,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
             ),
         ),
         _finalization(
-            "header", "Remate de cabeza", high_goal(Attribute.AT, 10),
+            "header", "Remate de cabeza", high_goal(Attribute.AT, 9),
             FinalizationOutcome(
                 "-2 a la presión, luego roba 1 CR",
                 OutcomeKind.PRESSURE_REDUCTION,
@@ -724,7 +724,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
              ),
         ),
         _finalization(
-            "long_shot", "Disparo lejano", high_goal(Attribute.AT, 10),
+            "long_shot", "Disparo lejano", high_goal(Attribute.AT, 9),
             FinalizationOutcome(
                 "+2 Presión y descarta una CC",
                 OutcomeKind.PRESSURE_REDUCTION,
@@ -747,10 +747,10 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         _finalization(
             "win_corner", "Buscar el córner",
             FinalizationOutcome(
-                "-7 Presión",
+                "-4 Presión",
                 OutcomeKind.PRESSURE_REDUCTION,
                 2,
-                Effect(pressure_delta=-6),
+                Effect(pressure_delta=-4),
                 strict_comparison(Attribute.MED, Attribute.DEF, 7),
             ),
             FinalizationOutcome(
@@ -837,7 +837,7 @@ def event_card_definitions() -> tuple[EventCard, ...]:
             3,
             Effect(discard_top_cards=3, pressure_delta=3),
             Effect(pressure_delta=-2, yellow_injury_rolls=1, discard_top_cards=2),
-            Effect(player_yellow_cards=1, discard_top_cards=1, pressure_delta=-4),
+            Effect(player_yellow_cards=1, discard_top_cards=1, pressure_delta=-3),
         ),
         _event(
             "offside",
@@ -859,9 +859,9 @@ def event_card_definitions() -> tuple[EventCard, ...]:
             "var",
             "VAR",
             1,
-            Effect(yellow_cards=1, pressure_delta=5, discard_top_cards=1),
-            Effect(cr_draws=1, pressure_delta=-1, discard_top_cards=1),
-            Effect(recover_control_cards=3, pressure_delta=5),
+            Effect(yellow_cards=1, pressure_delta=4, discard_top_cards=1),
+            Effect(cr_draws=1, discard_top_cards=1),
+            Effect(recover_control_cards=3, pressure_delta=4),
         ),
     )
 
@@ -1023,7 +1023,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Acción rival individual",
             _red_action(
                 Attribute.AT, Attribute.DEF, 6,
-                Effect(bot_goals=1)),
+                Effect(pressure_delta=6)),
             _red_action(
                 Attribute.AT, Attribute.DEF, 0,
                 Effect(pressure_delta=2, player_yellow_cards=1),
@@ -1038,9 +1038,9 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "balon_parado",
             "Balón parado",
-            _red_action(Attribute.AT, Attribute.DEF, 6, Effect(bot_goals=1)),
-            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=4)),
-            Effect(pressure_delta=3, discard_top_cards=1),
+            _red_action(Attribute.AT, Attribute.DEF, 6, Effect(pressure_delta=6)),
+            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=5)),
+            Effect(pressure_delta=4, discard_top_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 temporary_opponent_attribute=Attribute.AT,

@@ -49,3 +49,37 @@ class DecisionTreeTests(unittest.TestCase):
         plan = self.ai.choose_control_plan(state, card_catalogue()["one_on_one"])
 
         self.assertEqual(0, plan.cards_spent)
+
+    def test_ai_spends_control_to_turn_high_finalization_into_pressure_goal(self) -> None:
+        state = self._state(player=Team(15, 18, 26))
+        state.pressure = 7
+        state.hand = [_instance("game_control")]
+        finalization = card_catalogue()["one_on_one"]
+
+        plan = self.ai.choose_control_plan(state, finalization)
+
+        self.assertEqual((("game_control", "comparison_1"),), tuple(
+            (play.card_definition_id, play.option_key) for play in plan.plays
+        ))
+        self.engine.execute_control_plan(state, plan)
+        self.engine.resolve_finalization(state, CardInstance("test-one-on-one", finalization))
+        self.assertEqual(1, state.player_goals)
+        self.assertEqual(5, state.pressure)
+
+    def test_ai_keeps_controls_when_no_plan_can_avoid_bot_pressure_goal(self) -> None:
+        state = self._state(player=Team(1, 1, 1), opponent=Team(30, 30, 30))
+        state.pressure = 9
+        state.hand = [_instance("build_from_back")]
+
+        plan = self.ai.choose_control_plan(state, card_catalogue()["draw_foul"])
+
+        self.assertEqual(0, plan.cards_spent)
+
+    def test_ai_keeps_controls_when_high_finalization_already_scores_by_pressure(self) -> None:
+        state = self._state(player=Team(15, 18, 26))
+        state.pressure = 5
+        state.hand = [_instance("game_control")]
+
+        plan = self.ai.choose_control_plan(state, card_catalogue()["one_on_one"])
+
+        self.assertEqual(0, plan.cards_spent)

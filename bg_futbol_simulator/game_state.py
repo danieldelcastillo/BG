@@ -210,8 +210,9 @@ class MatchRules:
 
     ties_succeed: bool = False
     pressure_floor: int = 0
-    pressure_goal_threshold: int = 9
-    initial_pressure: int = 0
+    pressure_goal_threshold: int = 10
+    initial_pressure: int = 5
+    pressure_goal_reset: int = 5
     max_control_hand_size: int = 5
 
     def __post_init__(self) -> None:
@@ -221,6 +222,8 @@ class MatchRules:
             raise ValueError("El umbral de gol por presión no puede estar bajo su mínimo.")
         if not self.pressure_floor <= self.initial_pressure <= self.pressure_goal_threshold:
             raise ValueError("La presión inicial debe estar dentro de sus límites.")
+        if not self.pressure_floor <= self.pressure_goal_reset <= self.pressure_goal_threshold:
+            raise ValueError("El reinicio de presión tras gol debe estar dentro de sus límites.")
         if self.max_control_hand_size <= 0:
             raise ValueError("El límite de mano de CC debe ser al menos 1.")
 
@@ -333,7 +336,7 @@ class MatchState:
     red_discard_pile: list[CardInstance] = field(default_factory=list)
     pending_cc_bonus: int = 0
     pending_cf_bonus: int = 0
-    pressure: int = 0
+    pressure: int = 5
     player_goals: int = 0
     bot_goals_from_pressure: int = 0
     bot_goals_from_red_cards: int = 0

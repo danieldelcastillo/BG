@@ -156,8 +156,7 @@ class AutomaticPlayerAI:
             )
         return tuple(sorted(assessments, key=lambda item: item.definition_id))
 
-    @staticmethod
-    def _effect_value(state: MatchState, effect) -> int:
+    def _effect_value(self, state: MatchState, effect) -> int:
         """Escala común de efectos para ordenar descartes, no para resolver CC."""
 
         pressure_relief = min(
@@ -165,19 +164,17 @@ class AutomaticPlayerAI:
             max(0, -effect.pressure_delta),
         )
         pressure_cost = max(0, effect.pressure_delta)
-        # Sin presión que aliviar, restar presión no aporta nada.
-        wasted_pressure_cut = (
-            max(0, -effect.pressure_delta) * 30
-            if state.pressure <= state.rules.pressure_floor
-            else 0
+        _, player_goal_from_pressure, bot_goal_from_pressure = self.engine.pressure_after_delta(
+            state.rules, state.pressure, effect.pressure_delta
         )
         return (
             effect.cf_bonus * 100
             + effect.cc_bonus * 40
             + pressure_relief * 15
+            + (1_000 if player_goal_from_pressure else 0)
             - pressure_cost * 15
+            - (1_000 if bot_goal_from_pressure else 0)
             - effect.discard_top_cards * 5
-            - wasted_pressure_cut
         )
 
     @staticmethod
@@ -204,19 +201,14 @@ class AutomaticPlayerAI:
 
         return base_value + comparison_value - duplicate_penalty
 
-    @staticmethod
-    def _event_option_value(state: MatchState, option: EventOption) -> int:
+    def _event_option_value(self, state: MatchState, option: EventOption) -> int:
         effect = option.effect
         pressure_relief = min(
             state.pressure - state.rules.pressure_floor,
             max(0, -effect.pressure_delta),
         )
-        # Sin presión que aliviar, restar presión no aporta nada: se penaliza
-        # para que la IA prefiera otra opción si existe alguna disponible.
-        wasted_pressure_cut = (
-            max(0, -effect.pressure_delta) * 30
-            if state.pressure <= state.rules.pressure_floor
-            else 0
+        _, player_goal_from_pressure, bot_goal_from_pressure = self.engine.pressure_after_delta(
+            state.rules, state.pressure, effect.pressure_delta
         )
         random_cf_value = 70 if any(
             isinstance(card.card, FinalizationCard) for card in state.discard_pile
@@ -224,11 +216,6 @@ class AutomaticPlayerAI:
         recovery_value = 80 if any(
             isinstance(card.card, ControlCard) for card in state.discard_pile
         ) else 0
-        pressure_goal_penalty = (
-            1_000
-            if state.pressure + effect.pressure_delta > state.rules.pressure_goal_threshold
-            else 0
-        )
         return (
             effect.cr_draws * 70
             + effect.draw_main_cards * 55
@@ -237,12 +224,12 @@ class AutomaticPlayerAI:
             + effect.recover_control_cards * recovery_value
             + effect.play_random_discard_finalizations * random_cf_value
             + pressure_relief * 20
+            + (1_000 if player_goal_from_pressure else 0)
             - max(0, effect.pressure_delta) * 20
+            - (1_000 if bot_goal_from_pressure else 0)
             - effect.discard_top_cards * 25
             - effect.player_yellow_cards * 35
             - effect.player_red_cards * 50
             - effect.yellow_injury_rolls * 10
             - effect.red_injury_rolls * 15
-            - pressure_goal_penalty
-            - wasted_pressure_cut
         )

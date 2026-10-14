@@ -161,6 +161,7 @@ class FinalizationPreview:
     outcome: FinalizationOutcome
     resolution: FinalizationResolution
     projected_pressure: int
+    projected_player_goal_from_pressure: bool
     projected_bot_goal_from_pressure: bool
 
 
@@ -601,13 +602,14 @@ class RulesEngine:
                     outcome_kind=outcome.kind,
                     tier=outcome.tier,
                 )
-                projected_pressure, bot_goal_from_pressure = self.pressure_after_delta(
+                projected_pressure, player_goal_from_pressure, bot_goal_from_pressure = self.pressure_after_delta(
                     rules, pressure, outcome.effect.pressure_delta
                 )
                 return FinalizationPreview(
                     outcome,
                     resolution,
                     projected_pressure,
+                    player_goal_from_pressure,
                     bot_goal_from_pressure,
                 )
         raise RuntimeError(f"La CF {card.name} no tiene un resultado de reserva.")
@@ -852,13 +854,18 @@ class RulesEngine:
 
         state.pending_cc_bonus += effect.cc_bonus
         state.pending_cf_bonus += effect.cf_bonus
-        state.pressure, bot_goal = self.pressure_after_delta(
+        state.pressure, player_goal, bot_goal = self.pressure_after_delta(
             state.rules, state.pressure, effect.pressure_delta
         )
+        if player_goal:
+            state.player_goals += 1
+            if log:
+                self._log(state, "gol_jugador_presion", "El jugador marca al reducir la presión a 0; presión a 5")
+                self._log(state, "broma", _pick_joke(state, _GOAL_FOR_JOKES))
         if bot_goal:
             state.bot_goals_from_pressure += 1
             if log:
-                self._log(state, "gol_bot_presion", "El bot marca por superar presión 9; presión a 0")
+                self._log(state, "gol_bot_presion", "El bot marca al llevar la presión a 10; presión a 5")
                 self._log(state, "broma", _pick_joke(state, _GOAL_AGAINST_JOKES))
         state.player_goals += effect.goals
         if effect.goals and log:
@@ -1043,13 +1050,15 @@ class RulesEngine:
     @staticmethod
     def pressure_after_delta(
         rules: MatchRules, pressure: int, delta: int
-    ) -> tuple[int, bool]:
-        """Aplica presión y devuelve si el bot marca al superar el umbral."""
+    ) -> tuple[int, bool, bool]:
+        """Aplica presión y devuelve los goles del jugador y del bot, en ese orden."""
 
-        updated = max(rules.pressure_floor, pressure + delta)
-        if updated > rules.pressure_goal_threshold:
-            return rules.pressure_floor, True
-        return updated, False
+        updated = pressure + delta
+        if updated <= rules.pressure_floor:
+            return rules.pressure_goal_reset, True, False
+        if updated >= rules.pressure_goal_threshold:
+            return rules.pressure_goal_reset, False, True
+        return updated, False, False
 
     def play_match(self, state: MatchState, ai: "AutomaticPlayerAI") -> MatchResult:
         """Ejecuta un partido hasta que el mazo queda vacío."""

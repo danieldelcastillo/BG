@@ -196,6 +196,7 @@ def _hand_text(state: MatchState) -> str:
 _SPECTACULAR_BANNERS: dict[str, str] = {
     "penalti": "### 🥅⚽ ¡PENALTI!",
     "gol_jugador": "## 🏆⚽🎉🎊 ¡¡¡GOOOOOOL DE TU EQUIPO!!! 🎊🎉⚽🏆",
+    "gol_jugador_presion": "## 🏆⚽🎉🎊 ¡¡¡GOOOOOOL DE TU EQUIPO POR PRESIÓN!!! 🎊🎉⚽🏆",
     "gol_bot_presion": "## 🚨⚽💥 ¡¡¡GOOOOOOL DEL BOT!!! 💥⚽🚨",
     "gol_en_contra": "## 🚨⚽😱 ¡¡¡GOL EN CONTRA (CR)!!! 😱⚽🚨",
     "amarilla_bot": "### 🟨 ¡TARJETA AMARILLA PARA EL BOT!",
@@ -203,7 +204,7 @@ _SPECTACULAR_BANNERS: dict[str, str] = {
     "expulsion": "### 🟥🟥 ¡TARJETA ROJA — EXPULSIÓN!",
 }
 
-_GOAL_KINDS = frozenset(("gol_jugador", "gol_bot_presion", "gol_en_contra"))
+_GOAL_KINDS = frozenset(("gol_jugador", "gol_jugador_presion", "gol_bot_presion", "gol_en_contra"))
 
 
 def _spectacular_banner(kind: str) -> str | None:
@@ -214,6 +215,7 @@ def _spectacular_banner(kind: str) -> str | None:
 
 _SUMMARY_EVENT_LABELS: dict[str, str] = {
     "gol_jugador": "⚽ Gol del jugador",
+    "gol_jugador_presion": "⚽ Gol del jugador (presión)",
     "gol_bot_presion": "⚽ Gol del bot (presión)",
     "gol_en_contra": "⚽ Gol en contra (CR)",
     "amarilla_bot": "🟨 Amarilla al rival",
@@ -502,7 +504,8 @@ def write_match_trace(
     )
     line("- 🃏 Mazo: 28 CC, 12 CF y 10 CE; mazo de CR aparte: 16 (8 tipos × 2)")
     line(f"- ✋ Mano inicial: 0 CC; límite: {state.rules.max_control_hand_size} CC")
-    line("- 📈 Gol del bot: al superar presión 9, la presión vuelve a 0")
+    line("- 📉 Gol del jugador: al reducir la presión a 0, la presión vuelve a 5")
+    line("- 📈 Gol del bot: al llevar la presión a 10, la presión vuelve a 5")
     line(
         "- 🧠 Estrategia: "
         + (

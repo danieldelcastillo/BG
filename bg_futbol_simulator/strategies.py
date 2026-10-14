@@ -16,6 +16,7 @@ class _Candidate:
 
     plan: ControlPlan
     extra_player_goals: int
+    player_goal_from_pressure: bool
     cr_draws: int
     bot_goal_from_pressure: bool
     final_pressure: int
@@ -60,7 +61,7 @@ class OneNilLowCRAI(AutomaticPlayerAI):
         scoring_candidates = [
             candidate
             for candidate in self._candidate_plans(state, finalization)
-            if candidate.extra_player_goals > 0
+            if candidate.extra_player_goals > 0 or candidate.player_goal_from_pressure
         ]
         if not scoring_candidates:
             return ControlPlan()
@@ -128,6 +129,7 @@ class OneNilLowCRAI(AutomaticPlayerAI):
                 _Candidate(
                     plan=plan,
                     extra_player_goals=preview.outcome.effect.goals,
+                    player_goal_from_pressure=preview.projected_player_goal_from_pressure,
                     cr_draws=preview.outcome.effect.cr_draws,
                     bot_goal_from_pressure=preview.projected_bot_goal_from_pressure,
                     final_pressure=preview.projected_pressure,
@@ -162,6 +164,7 @@ class OneNilLowCRAI(AutomaticPlayerAI):
     def _candidate_key(candidate: _Candidate) -> tuple[object, ...]:
         return (
             candidate.extra_player_goals > 0,
+            candidate.player_goal_from_pressure,
             candidate.cr_draws > 0,
             candidate.bot_goal_from_pressure,
             candidate.final_pressure,
@@ -175,12 +178,14 @@ class OneNilLowCRAI(AutomaticPlayerAI):
         """Ordena CE por riesgo de alejarse del 1–0 sin CR."""
 
         effect = option.effect
-        would_score_bot = state.pressure + effect.pressure_delta > state.rules.pressure_goal_threshold
+        would_score_bot = state.pressure + effect.pressure_delta >= state.rules.pressure_goal_threshold
+        would_score_player = state.pressure + effect.pressure_delta <= state.rules.pressure_floor
         return (
             effect.cr_draws > 0,
             effect.draw_main_cards > 0,
             effect.play_random_discard_finalizations > 0,
             would_score_bot,
+            would_score_player,
             effect.player_yellow_cards > 0,
             effect.yellow_injury_rolls > 0 or effect.red_injury_rolls > 0,
             max(0, effect.pressure_delta),
@@ -193,8 +198,10 @@ class OneNilLowCRAI(AutomaticPlayerAI):
         """Conserva el mazo y busca recursos mientras aún se persigue el 1–0."""
 
         effect = option.effect
-        would_score_bot = state.pressure + effect.pressure_delta > state.rules.pressure_goal_threshold
+        would_score_bot = state.pressure + effect.pressure_delta >= state.rules.pressure_goal_threshold
+        would_score_player = state.pressure + effect.pressure_delta <= state.rules.pressure_floor
         return (
+            not would_score_player,
             effect.cr_draws > 0,
             would_score_bot,
             effect.player_yellow_cards > 0 or effect.player_red_cards > 0,

@@ -37,6 +37,7 @@ class _SearchResult:
     plan: ControlPlan
     tier: int
     projected_pressure: int
+    projected_player_goal_from_pressure: bool
     projected_bot_goal_from_pressure: bool
 
     @property
@@ -79,10 +80,11 @@ class DecisionTree:
     def choose_plan(self, state: MatchState, finalization: FinalizationCard) -> ControlPlan:
         """Devuelve la secuencia que maximiza el resultado de la CF.
 
-        Criterios, en orden: resultado de la CF, menor número de CC gastadas,
-        menor presión final y orden canónico estable. La búsqueda se detiene en
-        la primera capa con resultado superior: una capa posterior no puede
-        mejorar su tier y gastaría más CC, por lo que la cota es exacta.
+        Criterios, en orden: evitar un gol del bot cuando sea posible, resultado
+        de la CF, gol propio por presión, menor número de CC gastadas, menor
+        presión final y orden canónico estable. Si todas las alternativas
+        terminan en gol del bot, conserva las CC: no compensa gastarlas sin
+        poder evitar ese resultado.
         """
 
         initial = _DecisionPosition(
@@ -106,16 +108,15 @@ class DecisionTree:
             plan=ControlPlan(),
             tier=baseline.resolution.tier,
             projected_pressure=baseline.projected_pressure,
+            projected_player_goal_from_pressure=baseline.projected_player_goal_from_pressure,
             projected_bot_goal_from_pressure=baseline.projected_bot_goal_from_pressure,
         )
-        if baseline_result.tier == 2:
+        if baseline_result.tier == 2 and baseline_result.projected_player_goal_from_pressure:
             self._store(key, baseline_result)
             self.last_diagnostics = SearchDiagnostics(expanded_states, 0)
             return baseline_result.plan
 
-        # Si no hay un resultado medio inmediato, guardamos el primero que se
-        # encuentre. Seguimos explorando para demostrar si existe uno superior.
-        best_middle = baseline_result if baseline_result.tier == 1 else None
+        candidates: list[_SearchResult] = [baseline_result]
         frontier: dict[_DecisionPosition, _SearchNode] = {
             initial: _SearchNode(initial, ControlPlan())
         }
@@ -138,34 +139,35 @@ class DecisionTree:
                 break
             expanded_states += len(next_frontier)
 
-            high_candidates: list[_SearchResult] = []
-            middle_candidates: list[_SearchResult] = []
             for node in next_frontier.values():
                 preview = self._evaluate(state, node.position, finalization)
-                result = _SearchResult(
-                    plan=node.plan,
-                    tier=preview.resolution.tier,
-                    projected_pressure=preview.projected_pressure,
-                    projected_bot_goal_from_pressure=preview.projected_bot_goal_from_pressure,
+                candidates.append(
+                    _SearchResult(
+                        plan=node.plan,
+                        tier=preview.resolution.tier,
+                        projected_pressure=preview.projected_pressure,
+                        projected_player_goal_from_pressure=(
+                            node.position.player_goals > initial.player_goals
+                            or preview.projected_player_goal_from_pressure
+                        ),
+                        projected_bot_goal_from_pressure=(
+                            node.position.bot_goals > initial.bot_goals
+                            or preview.projected_bot_goal_from_pressure
+                        ),
+                    )
                 )
-                if result.tier == 2:
-                    high_candidates.append(result)
-                elif result.tier == 1 and best_middle is None:
-                    middle_candidates.append(result)
-
-            if high_candidates:
-                best = self._best(high_candidates)
-                self._store(key, best)
-                self.last_diagnostics = SearchDiagnostics(expanded_states, 0)
-                return best.plan
-
-            if middle_candidates:
-                best_middle = self._best(middle_candidates)
             frontier = next_frontier
 
-        # Si no se encontró un resultado superior, se prioriza el resultado
-        # medio que costó menos CC. Si tampoco existe, no se gasta ninguna.
-        result = best_middle or baseline_result
+        safe_candidates = [
+            candidate for candidate in candidates if not candidate.projected_bot_goal_from_pressure
+        ]
+        if not safe_candidates:
+            result = baseline_result
+        else:
+            best_tier = max(candidate.tier for candidate in safe_candidates)
+            result = self._best(
+                [candidate for candidate in safe_candidates if candidate.tier == best_tier]
+            )
         self._store(key, result)
         self.last_diagnostics = SearchDiagnostics(expanded_states, 0)
         return result.plan
@@ -261,7 +263,7 @@ class DecisionTree:
             card.conditional,
             option.effect,
         )
-        projected_pressure, bot_goal_from_pressure = self.engine.pressure_after_delta(
+        projected_pressure, player_goal_from_pressure, bot_goal_from_pressure = self.engine.pressure_after_delta(
             state.rules, position.pressure, effect.pressure_delta
         )
         return _DecisionPosition(
@@ -271,7 +273,7 @@ class DecisionTree:
             pending_cc_bonus=effect.cc_bonus,
             pending_cf_bonus=position.pending_cf_bonus + effect.cf_bonus,
             pressure=projected_pressure,
-            player_goals=position.player_goals + effect.goals,
+            player_goals=position.player_goals + effect.goals + (1 if player_goal_from_pressure else 0),
             bot_goals=(
                 position.bot_goals
                 + effect.bot_goals
@@ -302,6 +304,7 @@ class DecisionTree:
         return min(
             candidates,
             key=lambda result: (
+                not result.projected_player_goal_from_pressure,
                 result.plan.cards_spent,
                 result.projected_bot_goal_from_pressure,
                 result.projected_pressure,
@@ -328,6 +331,7 @@ class DecisionTree:
             state.rules.ties_succeed,
             state.rules.pressure_floor,
             state.rules.pressure_goal_threshold,
+            state.rules.pressure_goal_reset,
             position,
         )
 
