@@ -1061,8 +1061,8 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "robo_mediocampo",
             "Robo en medio campo",
-            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=4)),
-            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=5)),
+            _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=5)),
+            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=4)),
             Effect(pressure_delta=4, discard_control_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
@@ -1092,7 +1092,7 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "Pase cortado",
             _red_action(
                 Attribute.MED, Attribute.AT, 5,
-                Effect(recover_control_cards=1, pressure_delta=5),
+                Effect(discard_control_cards=1, pressure_delta=4),
             ),
             _red_action(
                 Attribute.MED, Attribute.MED, 1, 

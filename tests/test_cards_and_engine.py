@@ -256,11 +256,19 @@ class EngineTests(unittest.TestCase):
     def test_midfield_theft_red_card_uses_the_updated_effects(self) -> None:
         card = red_card_catalogue()["robo_mediocampo"]
 
-        self.assertEqual(4, card.actions[0].effect.pressure_delta)
+        self.assertEqual(5, card.actions[0].effect.pressure_delta)
         self.assertEqual(0, card.actions[0].effect.discard_control_cards)
-        self.assertEqual(5, card.actions[1].effect.pressure_delta)
+        self.assertEqual(4, card.actions[1].effect.pressure_delta)
         self.assertEqual(4, card.fallback_effect.pressure_delta)
         self.assertEqual(1, card.fallback_effect.discard_control_cards)
+
+    def test_intercepted_pass_first_red_card_action_adds_pressure_and_discards_control(self) -> None:
+        card = red_card_catalogue()["pase_cortado"]
+        effect = card.actions[0].effect
+
+        self.assertEqual(4, effect.pressure_delta)
+        self.assertEqual(1, effect.discard_control_cards)
+        self.assertEqual(0, effect.recover_control_cards)
 
     def test_top_deck_discard_skips_card_effects(self) -> None:
         state = _state()
