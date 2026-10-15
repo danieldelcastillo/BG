@@ -428,9 +428,9 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "build_from_back",
             "Construcción desde atrás",
             4,
-            Effect(cc_bonus=3),
-            Comparison(Attribute.MED, Attribute.DEF, 1),
-            Effect(cc_bonus=11),
+            Effect(cc_bonus=4),
+            Comparison(Attribute.MED, Attribute.MED, 0),
+            Effect(cc_bonus=10),
             Comparison(Attribute.DEF, Attribute.MED, 3),
             Effect(cf_bonus=4),
             condicional_cc(
@@ -462,7 +462,7 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Comparison(Attribute.MED, Attribute.DEF, 4),
             Effect(cf_bonus=5),
             Comparison(Attribute.MED, Attribute.MED, 1),
-            Effect(cc_bonus=11),
+            Effect(cc_bonus=10),
             condicional_cc(
                 RivalCondition.RIVAL_WINNING,
                 temporary_player_attribute=Attribute.MED,
@@ -474,7 +474,7 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Balón al espacio",
             3,
             Effect(cf_bonus=3, pressure_delta=1),
-            Comparison(Attribute.MED, Attribute.DEF, 11),
+            Comparison(Attribute.MED, Attribute.DEF, 10),
             Effect(cf_bonus=9, pressure_delta=1),
             Comparison(Attribute.AT, Attribute.DEF, 0),
             Effect(cc_bonus=9),
@@ -492,7 +492,7 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Comparison(Attribute.MED, Attribute.MED, 1),
             Effect(cc_bonus=6),
             Comparison(Attribute.AT, Attribute.MED, 7),
-            Effect(cf_bonus=11),
+            Effect(cf_bonus=10),
             condicional_cc(
                 RivalCondition.RIVAL_WINNING,
                 temporary_player_attribute=Attribute.MED,
@@ -551,8 +551,8 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             Effect(cf_bonus=3, pressure_delta=1),
             Comparison(Attribute.AT, Attribute.DEF, 4),
             Effect(cf_bonus=5),
-            Comparison(Attribute.AT, Attribute.DEF, 9),
-            Effect(cf_bonus=8, yellow_cards=1),
+            Comparison(Attribute.AT, Attribute.DEF, 8),
+            Effect(cf_bonus=6, yellow_cards=1),
             condicional_cc(
                 RivalCondition.RIVAL_LOSING,
                 temporary_player_attribute=Attribute.AT,
@@ -564,9 +564,9 @@ def control_card_definitions() -> tuple[ControlCard, ...]:
             "Control del juego",
             3,
             Effect(cc_bonus=5, discard_top_cards=1),
-            Comparison(Attribute.MED, Attribute.MED, 2),
+            Comparison(Attribute.MED, Attribute.MED, 4),
             Effect(pressure_delta=-2, cc_bonus=9),
-            Comparison(Attribute.MED, Attribute.MED, -1),
+            Comparison(Attribute.MED, Attribute.MED, 2),
             Effect(pressure_delta=-2, cc_bonus=7),
             condicional_cc(
                 RivalCondition.RIVAL_WINNING,
@@ -731,7 +731,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 "+2 Presión", 
                 1, 
                 2,
-                strict_comparison(Attribute.MED, Attribute.DEF, -2),
+                strict_comparison(Attribute.MED, Attribute.DEF, -3),
             ),
             cr(),
             condicional_cf(
@@ -746,7 +746,7 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 OutcomeKind.CR_DRAW,
                 1,
                 Effect(recover_control_cards=1,cr_draws=1),
-                strict_comparison(Attribute.AT, Attribute.DEF, -3),
+                strict_comparison(Attribute.AT, Attribute.DEF, -4),
             ),
             FinalizationOutcome(
                 "Roba 1 CR",
@@ -770,10 +770,10 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
                 discard_control_cards=1,
             ),
             FinalizationOutcome(
-                "Roba 1 CR",
+                "Roba 1 CR y descarta una carta del mazo",
                 OutcomeKind.CR_DRAW,
                 0,
-                Effect(cr_draws=1),
+                Effect(discard_top_cards=1, cr_draws=1),
             ),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,
@@ -1071,8 +1071,8 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "balon_parado",
             "Balón parado",
             _red_action(Attribute.AT, Attribute.DEF, 6, Effect(pressure_delta=6)),
-            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=5)),
-            Effect(pressure_delta=4, discard_top_cards=1),
+            _red_action(Attribute.AT, Attribute.DEF, 1, Effect(pressure_delta=4, discard_top_cards=1)),
+            Effect(pressure_delta=4),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 temporary_opponent_attribute=Attribute.AT,
@@ -1082,20 +1082,20 @@ def red_card_definitions() -> tuple[RedCard, ...]:
         _red_card(
             "centro_area_rival",
             "Centro al área",
-            _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=4)),
-            _red_action(Attribute.AT, Attribute.DEF, 0, Effect(pressure_delta=4, discard_top_cards=2)),
+            _red_action(Attribute.MED, Attribute.DEF, 4, Effect(pressure_delta=5)),
+            _red_action(Attribute.AT, Attribute.DEF, 0, Effect(pressure_delta=4, discard_top_cards=1, discard_control_cards=1)),
             Effect(pressure_delta=4, discard_control_cards=1),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
-                Effect(pressure_delta=4),
+                Effect(pressure_delta=3),
             ),
         ),
         _red_card(
             "robo_mediocampo",
             "Robo en medio campo",
             _red_action(Attribute.DEF, Attribute.MED, 3, Effect(pressure_delta=5)),
-            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=4)),
-            Effect(pressure_delta=4, discard_control_cards=1),
+            _red_action(Attribute.MED, Attribute.MED, 0, Effect(pressure_delta=4, discard_control_cards=1)),
+            Effect(pressure_delta=4),
             _red_conditional(
                 RivalCondition.RIVAL_LOSING,
                 Effect(discard_control_cards=1, pressure_delta=3),
@@ -1105,12 +1105,12 @@ def red_card_definitions() -> tuple[RedCard, ...]:
             "contraataque_rival",
             "Contraataque rival",
             _red_action(
-                Attribute.AT, Attribute.MED, 3,
-                Effect(pressure_delta=4)
+                Attribute.AT, Attribute.MED, 4,
+                Effect(pressure_delta=5)
             ),
             _red_action(
                 Attribute.AT, Attribute.MED, 0,
-                Effect(pressure_delta=4, recover_control_cards=1),
+                Effect(pressure_delta=3,discard_top_cards=1),
             ),
             Effect(pressure_delta=3),
             _red_conditional(
