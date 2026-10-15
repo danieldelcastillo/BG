@@ -652,6 +652,16 @@ def _finalization(
     )
 
 
+def pressure_effect(delta: int, /, **effect_values: int | float) -> Effect:
+    """Crea un efecto de presión con una única convención.
+
+    Un valor negativo reduce la presión del jugador; uno positivo la aumenta.
+    Los demás componentes del efecto se expresan como argumentos con nombre.
+    """
+
+    return Effect(pressure_delta=delta, **effect_values)
+
+
 def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
     """Devuelve las seis definiciones del mazo definitivo de 12 CF."""
 
@@ -662,24 +672,51 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
 
         return Comparison(player_attribute, opponent_attribute, modifier, ties_succeed=False)
 
-    high_goal = lambda attribute, modifier: FinalizationOutcome(
-        "-5 Presión", OutcomeKind.PRESSURE_REDUCTION, 2, Effect(pressure_delta=-5),
-        strict_comparison(attribute, Attribute.DEF, modifier),
-    )
+    def pressure_outcome(
+        name: str,
+        tier: int,
+        delta: int,
+        comparison: Comparison | None = None,
+        **effect_values: int | float,
+    ) -> FinalizationOutcome:
+        """Crea un resultado de CF que modifica la presión.
+
+        El signo de ``delta`` determina automáticamente si el resultado es una
+        reducción o un aumento de presión, evitando etiquetas contradictorias.
+        """
+
+        kind = (
+            OutcomeKind.PRESSURE_REDUCTION
+            if delta < 0
+            else OutcomeKind.PRESSURE_INCREASE
+        )
+        return FinalizationOutcome(
+            name, kind, tier, pressure_effect(delta, **effect_values), comparison
+        )
+
+    def high_pressure_reduction(attribute: Attribute, modifier: int) -> FinalizationOutcome:
+        """Resultado alto de CF: reduce 5 de presión, sin gol directo."""
+
+        return pressure_outcome(
+            "-5 Presión",
+            2,
+            -5,
+            strict_comparison(attribute, Attribute.DEF, modifier),
+        )
+
     cr = lambda: FinalizationOutcome("Roba 1 CR", OutcomeKind.CR_DRAW, 0, Effect(cr_draws=1))
-    nothing = lambda tier=0: FinalizationOutcome("Nada", OutcomeKind.NOTHING, tier, Effect())
 
     return (
         _finalization(
             "one_on_one", 
             "Mano a mano", 
-            high_goal(Attribute.AT, 9),
-            FinalizationOutcome(
+            high_pressure_reduction(Attribute.AT, 8),
+            pressure_outcome(
                 "Descarta 1 CC de la mano y +1 Presión",
-                OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(discard_control_cards=1, pressure_delta=2),
+                2,
                 strict_comparison(Attribute.AT, Attribute.DEF, -1),
+                discard_control_cards=1,
             ),
             cr(),
             condicional_cf(
@@ -689,13 +726,13 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
             ),
         ),
         _finalization(
-            "cutback", "Ultimo pase", high_goal(Attribute.MED, 7),
-            FinalizationOutcome(
+            "cutback", "Ultimo pase", high_pressure_reduction(Attribute.MED, 7),
+            pressure_outcome(
                 "+2 Presión", 
-                OutcomeKind.PRESSURE_REDUCTION, 
                 1, 
-                Effect(pressure_delta=2), 
-                strict_comparison(Attribute.MED, Attribute.DEF, -1)),
+                2,
+                strict_comparison(Attribute.MED, Attribute.DEF, -2),
+            ),
             cr(),
             condicional_cf(
                 RivalCondition.RIVAL_LOSING,
@@ -703,12 +740,12 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
             ),
         ),
         _finalization(
-            "header", "Remate de cabeza", high_goal(Attribute.AT, 9),
+            "header", "Remate de cabeza", high_pressure_reduction(Attribute.AT, 8),
             FinalizationOutcome(
-                "-2 a la presión, luego roba 1 CR",
-                OutcomeKind.PRESSURE_REDUCTION,
+                "Recupera 1 CC, luego roba 1 CR",
+                OutcomeKind.CR_DRAW,
                 1,
-                Effect(pressure_delta=-1,cr_draws=1),
+                Effect(recover_control_cards=1,cr_draws=1),
                 strict_comparison(Attribute.AT, Attribute.DEF, -3),
             ),
             FinalizationOutcome(
@@ -724,13 +761,13 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
              ),
         ),
         _finalization(
-            "long_shot", "Disparo lejano", high_goal(Attribute.AT, 9),
-            FinalizationOutcome(
+            "long_shot", "Disparo lejano", high_pressure_reduction(Attribute.AT, 8),
+            pressure_outcome(
                 "+2 Presión y descarta una CC",
-                OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(pressure_delta=2, discard_control_cards=1),
+                2,
                 strict_comparison(Attribute.AT, Attribute.DEF, -2),
+                discard_control_cards=1,
             ),
             FinalizationOutcome(
                 "Roba 1 CR",
@@ -746,25 +783,23 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         ),
         _finalization(
             "win_corner", "Buscar el córner",
-            FinalizationOutcome(
+            pressure_outcome(
                 "-4 Presión",
-                OutcomeKind.PRESSURE_REDUCTION,
                 2,
-                Effect(pressure_delta=-4),
+                -4,
                 strict_comparison(Attribute.MED, Attribute.DEF, 7),
             ),
-            FinalizationOutcome(
+            pressure_outcome(
                 "Descarta una CC de la mano, +1 Presión",
-                OutcomeKind.PRESSURE_REDUCTION,
                 1,
-                Effect(discard_control_cards=1, pressure_delta=1),
+                1,
                 strict_comparison(Attribute.MED, Attribute.DEF, -1),
+                discard_control_cards=1,
             ),
-            FinalizationOutcome(
-                "+2 Presión y descarta una CC de la mano",
-                OutcomeKind.PRESSURE_INCREASE,
+            pressure_outcome(
+                "+3 Presión",
                 0,
-                Effect(pressure_delta=2, discard_control_cards=1),
+                3,
             ),
             condicional_cf(
                 RivalCondition.RIVAL_LOSING,
@@ -774,30 +809,27 @@ def finalization_card_definitions() -> tuple[FinalizationCard, ...]:
         ),
         _finalization(
             "draw_foul", "Provocar la falta",
-            FinalizationOutcome(
+            pressure_outcome(
                 "Tarjeta amarilla par el rival, descarta una carta del mazo, y -5 a la presión",
-                OutcomeKind.YELLOW_CARD,
                 2,
-                Effect(
-                    yellow_cards=1,
-                    discard_top_cards=1,
-                    pressure_delta=-5,
-                    penalty_goal_probability=0.50,
-                ),
+                -5,
                 strict_comparison(Attribute.AT, Attribute.DEF, 7),
+                yellow_cards=1,
+                discard_top_cards=1,
+                penalty_goal_probability=0.50,
             ),
-            FinalizationOutcome(
+            pressure_outcome(
                 "Tarjeta amarilla y +2 Presión",
-                OutcomeKind.YELLOW_CARD,
                 1,
-                Effect(yellow_cards=1, pressure_delta=2),
+                2,
                 strict_comparison(Attribute.AT, Attribute.DEF, 2),
+                yellow_cards=1,
             ),
-            FinalizationOutcome(
+            pressure_outcome(
                 "+2 de Presión y descarta la primera carta del mazo",
-                OutcomeKind.CR_DRAW,
                 0,
-                Effect(pressure_delta=2, discard_top_cards=1),
+                2,
+                discard_top_cards=1,
             ),
             condicional_cf(
                 RivalCondition.RIVAL_WINNING,

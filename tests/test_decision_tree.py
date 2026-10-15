@@ -21,7 +21,7 @@ class DecisionTreeTests(unittest.TestCase):
         return MatchState(player=player, opponent=opponent, rules=MatchRules(), deck=[])
 
     def test_ai_finds_a_high_result_using_multiple_cards_in_order(self) -> None:
-        state = self._state(player=Team(15, 15, 20))
+        state = self._state(player=Team(15, 15, 18))
         state.hand = [
             _instance("through_ball"),
             _instance("individual_action"),

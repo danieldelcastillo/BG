@@ -74,6 +74,24 @@ class CardCatalogueTests(unittest.TestCase):
         self.assertEqual(("option_1", "option_2"), tuple(option.key for option in card.options))
         self.assertTrue(all(option.comparison is None for option in card.options))
 
+    def test_finalizations_use_pressure_instead_of_direct_player_goals(self) -> None:
+        finalizations = [
+            card for card in card_catalogue().values() if isinstance(card, FinalizationCard)
+        ]
+
+        self.assertTrue(all(outcome.effect.goals == 0 for card in finalizations for outcome in card.outcomes))
+        self.assertEqual(
+            {
+                "one_on_one": -5,
+                "cutback": -5,
+                "header": -5,
+                "long_shot": -5,
+                "win_corner": -4,
+                "draw_foul": -5,
+            },
+            {card.definition_id: card.outcomes[0].effect.pressure_delta for card in finalizations},
+        )
+
 
 class EngineTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -104,8 +122,8 @@ class EngineTests(unittest.TestCase):
         finalization = _instance("one_on_one")
         resolution = self.engine.resolve_finalization(state, finalization)
 
-        self.assertEqual(1, resolution.tier)
-        self.assertEqual(0, state.player_goals)
+        self.assertEqual(2, resolution.tier)
+        self.assertEqual(1, state.player_goals)
         self.assertEqual(0, state.pending_cf_bonus)
 
     def test_updated_finalization_comparisons_are_strict(self) -> None:
@@ -161,7 +179,7 @@ class EngineTests(unittest.TestCase):
             "Descarta 1 CC de la mano y +1 Presión",
             resolution.outcome_name,
         )
-        self.assertEqual(4, state.pressure)
+        self.assertEqual(5, state.pressure)
         self.assertEqual(1, state.bot_goals_from_pressure)
         kinds = [event.kind for event in state.events]
         self.assertLess(kinds.index("cf_condicional"), kinds.index("resuelve_cf"))
